@@ -1,74 +1,120 @@
-# TermuxMusic95: The X11 MP3 Player for Termux
+ **TermuxMusic95** project — WinAMP 2.x clone for Termux, written entirely in C++. This version emphasizes clarity, user guidance, and modern open-source standards.
 
-TermuxMusic95 is a modular, C++ MP3 player designed specifically for the Termux environment on Android, leveraging X11 for its classic Winamp 2.x-style graphical interface. It uses `mpg123` for decoding, `PulseAudio` for sound output, and implements a Fast Fourier Transform (FFT) for real-time visualization.
+***
 
-## 💾 Prerequisites
+# TermuxMusic95
 
-Before compiling and running, you must install the necessary packages in your Termux environment:
+*An X11-based MP3 player for Termux, inspired by WinAMP 2.x and written entirely in C++.*
 
-1.  **Core Development Tools:**
-    ```bash
-    pkg install clang make x11-repo
-    ```
-2.  **Required Libraries:**
-    ```bash
-    pkg install termux-x11 pulseaudio xproto
-    ```
-3.  **Setup X11:**
-    TermuxMusic95 requires an active X server. Run the following command to start it (if it's not already running):
-    ```bash
-    termux-x11 :0 &
-    ```
-4.  **Set Display Variable:**
-    Ensure your terminal session knows where to send the X11 window:
-    ```bash
-    export DISPLAY=:0
-    ```
+***
 
-## 🏗️ Project Structure
+## 🚀 Overview
 
-The player is organized into several modular files for maintainability:
+**TermuxMusic95** brings the nostalgic look and functionality of WinAMP 2.x to Android’s Termux environment. With a familiar GUI rendered via X11, robust MP3 playback thanks to `mpg123`, PulseAudio integration, and real-time spectrum visualizations via FFT, this project demonstrates what’s possible with modern terminal environments on Android.
 
-| File | Description |
-| :--- | :--- |
-| `Makefile` | Build script using `g++` and linking all required libraries. |
-| `main.cpp` | Application entry point and playlist argument parsing. |
-| `AppState.h` | Defines shared data structures, application state, and global constants (like colors and dimensions). |
-| `GUI.h`/`GUI.cpp` | Handles X11 window management, drawing the Winamp 2.x interface, and processing user input (mouse/keyboard). |
-| `AudioEngine.h`/`AudioEngine.cpp` | Manages the playback thread, `mpg123` decoding, PulseAudio streaming, volume control, and metadata updates. |
-| `FFT.h`/`FFT.cpp` | Contains the Fast Fourier Transform (FFT) logic used for the real-time spectrum analyzer visualization. |
+***
 
-## 🛠️ Building
+## ✨ Features
 
-1.  **Save all files:** Ensure all source files (`.cpp`, `.h`, and `Makefile`) are saved in the same directory.
-2.  **Compile:** Use the provided `Makefile` to compile the project:
-    ```bash
-    make
-    ```
-    This creates an executable file named `TermuxMusic95`.
+- Classic WinAMP-inspired graphical user interface (X11)
+- MP3 playback with metadata support (`mpg123`)
+- PulseAudio streaming
+- Real-time spectrum analyzer (FFT-based)
+- Keyboard and mouse controls
+- Playlist and folder support
 
-## ▶️ Running
+***
 
-The player requires a playlist source (MP3 file, folder, or `.m3u` file) as a command-line argument.
+## 🛠️ Prerequisites
 
-```bash
-# Example 1: Play a single MP3 file
-./TermuxMusic95 /sdcard/Music/awesome_track.mp3
+Make sure you have these components installed in your Termux environment:
 
-# Example 2: Load all MP3 files from a directory
-./TermuxMusic95 /sdcard/Music/MyAlbum
-
-# Example 3: Load a specific playlist file
-./TermuxMusic95 /sdcard/Playlists/retro.m3u
+```sh
+pkg install clang make x11-repo
+pkg install termux-x11 pulseaudio xproto ffmpeg
 ```
+
+1. **X Server:**  
+   Launch an X server with:
+   ```sh
+   termux-x11 :0 &
+   ```
+2. **Set the DISPLAY variable:**
+   ```sh
+   export DISPLAY=:0
+   ```
+
+***
+
+## 📂 Project Structure
+| Folder / File | Description                                         |
+| ------------- | --------------------------------------------------- |
+| src/          | C++ source code files                               |
+| include/      | C++ header files                                    |
+| build/        | Compiled build artifacts (executables, binaries)    |
+| Makefile      | Build script usingg++, links all required libraries |
+| main.cpp      | Entry point, parses arguments and playlist          |
+
+***
+
+## 🏗️ Build Instructions
+
+1. **Clone the repository and change into its directory:**
+   ```sh
+   git clone https://github.com/quydev-fs/TermuxMusic95.git
+   cd TermuxMusic95
+   ```
+2. **Build the project:**
+   ```sh
+   make
+   ```
+   This will generate the `TermuxMusic95` executable.
+
+***
+
+## ▶️ Usage
+
+The player takes a file, directory, or `.m3u` playlist as a command-line argument:
+
+```sh
+# Play a single file
+./build/bin/TermuxMusic95 /sdcard/Music/track.mp3
+
+# Play all MP3s in a directory
+./build/bin/TermuxMusic95 /sdcard/Music/AlbumFolder
+
+# Play using an M3U playlist
+./build/bin/TermuxMusic95 /sdcard/Playlists/playlist.m3u
+```
+
+***
+
 ## ⌨️ Controls
-The player supports both mouse input (clicking the virtual buttons, seeking on the bar, and dragging the volume slider) and keyboard shortcuts:
-| Key | Function |
-|---|---|
-| Z | Previous Track |
-| X | Play/Resume |
-| C | Pause |
-| V | Stop (Resets track position) |
-| B | Next Track |
-| Up Arrow | Increase Volume |
-| Down Arrow | Decrease Volume |
+
+**Mouse:**  
+- Click buttons, seek bar, and drag the volume slider
+
+**Keyboard shortcuts:**
+
+| Key        | Action             |
+|------------|--------------------|
+| Z          | Previous Track     |
+| X          | Play/Resume        |
+| C          | Pause              |
+| V          | Stop/Reset         |
+| B          | Next Track         |
+| Up Arrow   | Volume Up          |
+| Down Arrow | Volume Down        |
+
+***
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
+
+***
+
+## 🙋 FAQ & Contribution
+
+- **Bugs and feature requests:** Please open issues and PRs on GitHub.
+- **Contact:** See repository issues or discussions for support

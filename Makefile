@@ -36,4 +36,3 @@ clean:
 	@echo "Cleaned build artifacts."
 
 .PHONY: all clean directories
-
