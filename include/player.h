@@ -1,20 +1,19 @@
-#ifndef AUDIOENGINE_H
-#define AUDIOENGINE_H
+#ifndef PLAYER_H
+#define PLAYER_H
 
-#include "AppState.h"
+#include "common.h"
 #include <pthread.h>
 
-class AudioEngine {
+class Player {
 public:
-    AudioEngine(AppState* state);
-    ~AudioEngine();
+    Player(AppState* state);
+    ~Player();
     void start();
     void stop();
 
 private:
     static void* threadEntry(void* arg);
     void audioLoop();
-
     AppState* app;
     pthread_t threadId;
 };

@@ -1,23 +1,22 @@
-#ifndef GUI_H
-#define GUI_H
+#ifndef UI_H
+#define UI_H
 
-#include "AppState.h"
+#include "common.h"
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
-class GUI {
+class UI {
 public:
-    GUI(AppState* state);
-    ~GUI();
+    UI(AppState* state);
+    ~UI();
     bool init();
     void runLoop();
 
 private:
     void render();
-    void handleInput(int x, int y, int type);
+    void handleInput(int x, int y);
     void handleKey(KeySym ks);
     
-    // Helpers
     void drawBevel(int x, int y, int w, int h, bool sunken);
     void drawButton(int x, int y, int w, int h, const char* label, bool pressed);
     void drawText(int x, int y, const char* str, unsigned long color);

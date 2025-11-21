@@ -1,4 +1,4 @@
-#include "GUI.h"
+#include "ui.h"
 #include <X11/keysym.h>
 #include <unistd.h>
 #include <algorithm>
@@ -6,16 +6,16 @@
 #include <cstring>
 #include <cstdio>
 
-GUI::GUI(AppState* state) : app(state), dpy(nullptr) {}
+UI::UI(AppState* state) : app(state), dpy(nullptr) {}
 
-GUI::~GUI() {
+UI::~UI() {
     if (dpy) {
         XDestroyWindow(dpy, win);
         XCloseDisplay(dpy);
     }
 }
 
-bool GUI::init() {
+bool UI::init() {
     dpy = XOpenDisplay(NULL);
     if (!dpy) return false;
     
@@ -40,7 +40,7 @@ bool GUI::init() {
     return true;
 }
 
-void GUI::drawBevel(int x, int y, int w, int h, bool sunken) {
+void UI::drawBevel(int x, int y, int w, int h, bool sunken) {
     XSetForeground(dpy, gc, sunken ? C_BTN_D : C_BTN_L);
     XDrawLine(dpy, win, gc, x, y, x+w-2, y);
     XDrawLine(dpy, win, gc, x, y, x, y+h-2);
@@ -49,25 +49,23 @@ void GUI::drawBevel(int x, int y, int w, int h, bool sunken) {
     XDrawLine(dpy, win, gc, x, y+h-1, x+w-1, y+h-1);
 }
 
-void GUI::drawButton(int x, int y, int w, int h, const char* label, bool pressed) {
+void UI::drawButton(int x, int y, int w, int h, const char* label, bool pressed) {
     XSetForeground(dpy, gc, C_FACE);
     XFillRectangle(dpy, win, gc, x+1, y+1, w-2, h-2);
     drawBevel(x, y, w, h, pressed);
     XSetForeground(dpy, gc, pressed ? C_TXT_GRN : 0xC0C0C0);
-    drawText(x + (w - (strlen(label)*6))/2, y + (h+4)/2, label, 0); // roughly centered
+    drawText(x + (w - (strlen(label)*6))/2, y + (h+4)/2, label, 0);
 }
 
-void GUI::drawText(int x, int y, const char* str, unsigned long color) {
+void UI::drawText(int x, int y, const char* str, unsigned long color) {
     if(color != 0) XSetForeground(dpy, gc, color);
     XDrawString(dpy, win, gc, x, y, str, strlen(str));
 }
 
-void GUI::render() {
-    // Background
+void UI::render() {
     XSetForeground(dpy, gc, C_FACE);
     XFillRectangle(dpy, win, gc, 0, 0, W_WIDTH, W_HEIGHT);
     
-    // Title Bar
     XSetForeground(dpy, gc, C_TITLE_BG);
     XFillRectangle(dpy, win, gc, 0, 0, W_WIDTH, 14);
     drawBevel(0, 0, W_WIDTH, 14, false);
@@ -77,11 +75,9 @@ void GUI::render() {
     std::string disp = app->current_title + " *** " + app->current_title;
     if (++scroll_tick % 5 == 0) scroll_x++;
     if (scroll_x > (int)app->current_title.length() * 7) scroll_x = 0;
-    
     std::string sub = disp.substr(scroll_x / 7, 30);
     drawText(10, 11, sub.c_str(), 0xFFFFFF);
     
-    // Viz
     XSetForeground(dpy, gc, C_VIS_BG);
     XFillRectangle(dpy, win, gc, 20, 24, 76, 16);
     drawBevel(19, 23, 78, 18, true);
@@ -100,7 +96,6 @@ void GUI::render() {
         }
     }
 
-    // Time
     XSetForeground(dpy, gc, C_VIS_BG);
     XFillRectangle(dpy, win, gc, 35, 45, 46, 20);
     drawBevel(34, 44, 48, 22, true);
@@ -108,13 +103,11 @@ void GUI::render() {
     char ts[16]; sprintf(ts, "%02ld:%02ld", secs/60, secs%60);
     drawText(42, 60, ts, C_TXT_GRN);
 
-    // Bitrate Info
     char meta[32]; sprintf(meta, "%d", (int)app->bitrate);
     drawText(112, 42, meta, C_TXT_GRN); drawText(155, 42, "kbps", C_TXT_GRN);
     sprintf(meta, "%d", (int)app->sample_rate/1000);
     drawText(112, 52, meta, C_TXT_GRN); drawText(155, 52, "kHz", C_TXT_GRN);
 
-    // Seek Bar
     int sw = 250; int sx = 12; int sy = 72;
     drawBevel(sx, sy, sw, 10, true);
     if (app->total_frames > 0) {
@@ -125,14 +118,12 @@ void GUI::render() {
         drawBevel(nx, sy+1, 10, 8, false);
     }
 
-    // Volume
     drawBevel(100, 90, 100, 5, true);
     int vx = 100 + (int)((app->volume/100.0) * 90);
     XSetForeground(dpy, gc, C_BTN_L);
     XFillRectangle(dpy, win, gc, vx, 87, 10, 10);
     drawBevel(vx, 87, 10, 10, false);
 
-    // Buttons
     int by = 88;
     drawButton(16, by, 20, 18, "|<", false);
     drawButton(39, by, 20, 18, ">", app->playing && !app->paused);
@@ -141,8 +132,7 @@ void GUI::render() {
     drawButton(108, by, 20, 18, ">|", false);
 }
 
-void GUI::handleInput(int x, int y, int type) {
-    // Controls
+void UI::handleInput(int x, int y) {
     if (y >= 88 && y <= 106) {
         if (x>=16 && x<36) { if(app->track_idx > 0) app->track_idx--; app->playing=true; }
         else if (x>=39 && x<59) { app->playing = true; app->paused = false; }
@@ -150,12 +140,10 @@ void GUI::handleInput(int x, int y, int type) {
         else if (x>=85 && x<105) { app->playing = false; app->paused = false; app->current_frame=0; }
         else if (x>=108 && x<128) { if(app->track_idx < app->playlist.size()-1) app->track_idx++; app->playing=true; }
     }
-    // Seek
     if (y >= 72 && y <= 82 && x >= 12 && x <= 262) {
         app->seek_pos = (double)(x - 12) / 250.0;
         app->seek_request = true;
     }
-    // Volume
     if (y >= 85 && y <= 100 && x >= 100 && x <= 200) {
         int v = x - 100;
         if (v < 0) v = 0; if (v > 100) v = 100;
@@ -163,7 +151,7 @@ void GUI::handleInput(int x, int y, int type) {
     }
 }
 
-void GUI::handleKey(KeySym ks) {
+void UI::handleKey(KeySym ks) {
     if (ks == XK_x) { app->playing = true; app->paused = false; }
     if (ks == XK_c) { if(app->playing) app->paused = !app->paused; }
     if (ks == XK_v) { app->playing = false; }
@@ -171,15 +159,15 @@ void GUI::handleKey(KeySym ks) {
     if (ks == XK_b) { if(app->track_idx < app->playlist.size()-1) app->track_idx++; app->playing=true; }
 }
 
-void GUI::runLoop() {
+void UI::runLoop() {
     XEvent e;
     while (app->running) {
         if (XPending(dpy)) {
             XNextEvent(dpy, &e);
             if (e.type == ClientMessage && (unsigned long)e.xclient.data.l[0] == wmDeleteMessage) app->running = false;
             else if (e.type == Expose) render();
-            else if (e.type == ButtonPress) { handleInput(e.xbutton.x, e.xbutton.y, 0); render(); }
-            else if (e.type == MotionNotify && (e.xmotion.state & Button1Mask)) { handleInput(e.xmotion.x, e.xmotion.y, 1); render(); }
+            else if (e.type == ButtonPress) { handleInput(e.xbutton.x, e.xbutton.y); render(); }
+            else if (e.type == MotionNotify && (e.xmotion.state & Button1Mask)) { handleInput(e.xmotion.x, e.xmotion.y); render(); }
             else if (e.type == KeyPress) { handleKey(XLookupKeysym(&e.xkey, 0)); render(); }
         } else {
             render();

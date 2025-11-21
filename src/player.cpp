@@ -1,5 +1,5 @@
-#include "AudioEngine.h"
-#include "FFT.h"
+#include "player.h"
+#include "visualizer.h"
 #include <mpg123.h>
 #include <pulse/simple.h>
 #include <pulse/error.h>
@@ -8,29 +8,29 @@
 #include <algorithm>
 #include <iostream>
 
-AudioEngine::AudioEngine(AppState* state) : app(state) {
+Player::Player(AppState* state) : app(state) {
     mpg123_init();
 }
 
-AudioEngine::~AudioEngine() {
+Player::~Player() {
     stop();
     mpg123_exit();
 }
 
-void AudioEngine::start() {
+void Player::start() {
     pthread_create(&threadId, NULL, threadEntry, this);
 }
 
-void AudioEngine::stop() {
+void Player::stop() {
     pthread_join(threadId, NULL);
 }
 
-void* AudioEngine::threadEntry(void* arg) {
-    ((AudioEngine*)arg)->audioLoop();
+void* Player::threadEntry(void* arg) {
+    ((Player*)arg)->audioLoop();
     return NULL;
 }
 
-void AudioEngine::audioLoop() {
+void Player::audioLoop() {
     mpg123_handle* mh = mpg123_new(NULL, NULL);
     pa_simple* pa = NULL;
     const size_t buff_size = 8192;
@@ -58,7 +58,7 @@ void AudioEngine::audioLoop() {
         if (pa) pa_simple_free(pa);
         pa = pa_simple_new(NULL, "TermuxMusic95", PA_STREAM_PLAYBACK, NULL, "Music", &ss, NULL, NULL, &err);
 
-        // Update Metadata
+        // Metadata Update
         mpg123_id3v1* v1; mpg123_id3v2* v2;
         if (mpg123_id3(mh, &v1, &v2) == MPG123_OK) {
             if (v2 && v2->title) app->current_title = v2->title->p;
@@ -68,7 +68,6 @@ void AudioEngine::audioLoop() {
             app->current_title = app->playlist[app->track_idx];
         }
 
-        // Playback Loop
         while (app->playing && app->running) {
              if (app->seek_request) {
                 off_t offset = (off_t)(app->seek_pos * app->total_frames);
@@ -90,11 +89,9 @@ void AudioEngine::audioLoop() {
             if(mpg123_info(mh, &fi) == MPG123_OK) app->bitrate = fi.bitrate;
             app->current_frame = mpg123_tell(mh);
 
-            // FFT & Volume
+            // FFT
             int16_t* samples = (int16_t*)buffer;
             int sample_count = done / 2;
-            
-            // FFT Analysis
             CArray data(512);
             for(int i=0; i<512 && i<sample_count; i++) data[i] = (double)samples[i];
             computeFFT(data);
@@ -107,7 +104,6 @@ void AudioEngine::audioLoop() {
                 else app->viz_bands[i] = std::max(0, app->viz_bands[i] - 1);
             }
 
-            // Volume Application
             float vol = (float)app->volume / 100.0f;
             vol = vol * vol * vol; 
             for(int i=0; i<sample_count; i++) samples[i] = (int16_t)(samples[i] * vol);

@@ -1,18 +1,39 @@
-CXX = g++
-CXXFLAGS = -std=c++17 -Wall -O2 -I/data/data/com.termux/files/usr/include
-LDFLAGS = -L/data/data/com.termux/files/usr/lib -lX11 -lmpg123 -lpulse -lpulse-simple -lpthread
+# TermuxMusic95 Makefile
 
-TARGET = TermuxMusic95
-SRCS = main.cpp GUI.cpp AudioEngine.cpp FFT.cpp
-OBJS = $(SRCS:.cpp=.o)
+CXX      := g++
+CXXFLAGS := -std=c++17 -Wall -O2 -Iinclude -I/data/data/com.termux/files/usr/include
+LDFLAGS  := -L/data/data/com.termux/files/usr/lib -lX11 -lmpg123 -lpulse -lpulse-simple -lpthread
 
-all: $(TARGET)
+# Directory Structure
+SRC_DIR := src
+INC_DIR := include
+OBJ_DIR := build/obj
+BIN_DIR := build/bin
+
+# Files
+TARGET  := $(BIN_DIR)/TermuxMusic95
+SRCS    := $(wildcard $(SRC_DIR)/*.cpp)
+OBJS    := $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(SRCS))
+
+# Build Rules
+all: directories $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CXX) $(OBJS) -o $(TARGET) $(LDFLAGS)
+	@echo "Linking..."
+	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
+	@echo "Build Complete: $@"
 
-%.o: %.cpp
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+	@echo "Compiling $<..."
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
+directories:
+	@mkdir -p $(OBJ_DIR)
+	@mkdir -p $(BIN_DIR)
+
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -rf build
+	@echo "Cleaned build artifacts."
+
+.PHONY: all clean directories
+

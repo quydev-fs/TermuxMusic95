@@ -1,0 +1,12 @@
+# Build artifacts
+build/
+*.o
+*.d
+
+# Executables
+TermuxMusic95
+TermuxMusic95.exe
+
+# OS junk
+.DS_Store
+thumbs.db
