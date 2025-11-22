@@ -18,6 +18,13 @@ const unsigned long C_TXT_YEL = 0xD2D200;
 const unsigned long C_VIS_BG = 0x000000;
 const unsigned long C_TITLE_BG = 0x000080;
 
+// --- REPEAT STATES ---
+enum RepeatMode {
+    REP_OFF = 0,
+    REP_ONE = 1,
+    REP_ALL = 2
+};
+
 struct AppState {
     std::atomic<bool> running{true};
     std::atomic<bool> playing{false};
@@ -26,13 +33,13 @@ struct AppState {
 
     // Playback State
     std::atomic<bool> shuffle{false};
-    std::atomic<bool> repeat{false};
+    std::atomic<int> repeatMode{REP_OFF}; // Changed from bool to int (0=Off, 1=One, 2=All)
 
     // Audio Data
     std::vector<std::string> playlist;
-    std::vector<size_t> play_order; // The mapping vector (0,1,2 or Randomized)
+    std::vector<size_t> play_order; 
     
-    std::atomic<size_t> track_idx{0}; // Index into play_order
+    std::atomic<size_t> track_idx{0}; 
     std::atomic<long> current_frame{0};
     std::atomic<long> total_frames{0};
     std::atomic<int> sample_rate{44100};

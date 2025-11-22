@@ -133,9 +133,26 @@ void UI::render() {
     drawButton(85, by, 20, 18, "[]", false);
     drawButton(108, by, 20, 18, ">|", false);
 
-    // --- FIX: Update Buttons with State (app->shuffle/repeat) ---
+    // Draw Shuffle
     drawButton(200, 90, 20, 12, "SH", app->shuffle);
-    drawButton(225, 90, 20, 12, "RP", app->repeat);
+
+    // Draw Repeat (3 States)
+    const char* rpLabel = "RP";
+    bool rpActive = false;
+    
+    if (app->repeatMode == REP_ONE) {
+        rpLabel = "1"; // Show "1" for single repeat
+        rpActive = true;
+    } else if (app->repeatMode == REP_ALL) {
+        rpLabel = "AL"; // Show "AL" for All
+        rpActive = true;
+    } else {
+        rpLabel = "RP"; // Standard label when off
+        rpActive = false;
+    }
+    drawButton(225, 90, 20, 12, rpLabel, rpActive);
+    
+    // Save Button
     drawButton(250, 90, 20, 12, "SV", false); 
 }
 
@@ -153,11 +170,13 @@ void UI::handleInput(int x, int y) {
         // SH (Shuffle)
         if (x >= 200 && x <= 220) {
             app->shuffle = !app->shuffle;
-            toggleShuffle(*app); // Recalculate play order
+            toggleShuffle(*app);
         }
-        // RP (Repeat)
+        // RP (Repeat 3-State Toggle)
         else if (x >= 225 && x <= 245) {
-            app->repeat = !app->repeat;
+            int mode = app->repeatMode;
+            mode = (mode + 1) % 3; // Cycle 0 -> 1 -> 2 -> 0
+            app->repeatMode = mode;
         }
         // SV (Save)
         else if (x >= 250 && x <= 270) {
@@ -183,7 +202,13 @@ void UI::handleKey(KeySym ks) {
     if (ks == XK_z) { if(app->track_idx > 0) app->track_idx--; app->playing=true; }
     if (ks == XK_b) { if(app->track_idx < app->playlist.size()-1) app->track_idx++; app->playing=true; }
     if (ks == XK_s) { savePlaylist(*app); }
-    if (ks == XK_r) { app->repeat = !app->repeat; } // Added 'R' hotkey
+    
+    // Hotkey for Repeat Cycle
+    if (ks == XK_r) { 
+        int mode = app->repeatMode;
+        mode = (mode + 1) % 3;
+        app->repeatMode = mode;
+    } 
 }
 
 void UI::runLoop() {

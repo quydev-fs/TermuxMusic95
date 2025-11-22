@@ -7,14 +7,14 @@
 #include <ctime>
 #include <iostream>
 #include <iomanip>
-#include <numeric> // for std::iota
-#include <random>  // for std::mt19937
-#include <chrono>  // for seed
+#include <numeric> 
+#include <random>  
+#include <chrono>  
 #include <sstream>
+
 void loadPlaylist(AppState& app, int argc, char** argv) {
     if (argc < 2) return;
 
-    // 1. Clear existing data to prevent duplicates on reload
     app.playlist.clear();
     app.play_order.clear();
 
@@ -51,7 +51,6 @@ void loadPlaylist(AppState& app, int argc, char** argv) {
     }
     std::sort(app.playlist.begin(), app.playlist.end());
     
-    // CRITICAL FIX: Initialize the shuffle map immediately
     app.play_order.resize(app.playlist.size());
     std::iota(app.play_order.begin(), app.play_order.end(), 0);
 }
@@ -59,29 +58,24 @@ void loadPlaylist(AppState& app, int argc, char** argv) {
 void toggleShuffle(AppState& app) {
     if (app.playlist.empty()) return;
 
-    // Safety check: Ensure sizes match
     if (app.play_order.size() != app.playlist.size()) {
         app.play_order.resize(app.playlist.size());
         std::iota(app.play_order.begin(), app.play_order.end(), 0);
     }
 
-    // 1. Identify current actual song index
     size_t current_real_index = 0;
     if (app.track_idx < app.play_order.size()) {
         current_real_index = app.play_order[app.track_idx];
     }
 
     if (app.shuffle) {
-        // Turning ON: Shuffle with Mersenne Twister
         unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
         std::mt19937 g(seed);
         std::shuffle(app.play_order.begin(), app.play_order.end(), g);
     } else {
-        // Turning OFF: Restore 0, 1, 2...
         std::iota(app.play_order.begin(), app.play_order.end(), 0);
     }
 
-    // 2. Update track_idx so the current song keeps playing without skipping
     for(size_t i=0; i<app.play_order.size(); i++) {
         if(app.play_order[i] == current_real_index) {
             app.track_idx = i;
@@ -89,11 +83,7 @@ void toggleShuffle(AppState& app) {
         }
     }
     
-    // Debug output to confirm shuffle happened
-    std::cout << "Shuffle Toggled. First 3 indices: " 
-              << app.play_order[0] << ", " 
-              << (app.play_order.size() > 1 ? std::to_string(app.play_order[1]) : "") << ", "
-              << (app.play_order.size() > 2 ? std::to_string(app.play_order[2]) : "") << std::endl;
+    std::cout << "Shuffle Toggled." << std::endl;
 }
 
 bool savePlaylist(const AppState& app, std::string filename) {

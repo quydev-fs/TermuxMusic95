@@ -7,7 +7,7 @@
 #include <cmath>
 #include <algorithm>
 #include <iostream>
-#include <numeric> // Added for iota fix
+#include <numeric>
 
 Player::Player(AppState* state) : app(state) {
     mpg123_init();
@@ -44,14 +44,13 @@ void Player::audioLoop() {
             continue;
         }
 
-        // --- FAIL-SAFE: Ensure Play Order exists ---
+        // Fail-Safe
         if (app->play_order.size() != app->playlist.size()) {
-            std::cout << "Fixing Play Order Sync..." << std::endl;
             app->play_order.resize(app->playlist.size());
             std::iota(app->play_order.begin(), app->play_order.end(), 0);
         }
 
-        // Get actual file index from the shuffle map
+        // Get actual file index
         size_t actual_file_index = app->track_idx;
         if (app->track_idx < app->play_order.size()) {
             actual_file_index = app->play_order[app->track_idx];
@@ -96,15 +95,24 @@ void Player::audioLoop() {
 
             int ret = mpg123_read(mh, buffer, buff_size, &done);
             
-            // --- END OF TRACK LOGIC ---
+            // --- REPEAT LOGIC ---
             if (ret == MPG123_DONE) {
+                
+                // Case 1: Repeat One (Loop current track)
+                if (app->repeatMode == REP_ONE) {
+                    // Do not increment track_idx.
+                    // Break inner loop, which reloads the SAME track_idx
+                    break; 
+                }
+
+                // Case 2: Normal / Repeat All
                 size_t next = app->track_idx + 1;
                 
-                // Check against list size
                 if (next >= app->playlist.size()) {
-                    if (app->repeat) {
-                        next = 0; 
+                    if (app->repeatMode == REP_ALL) {
+                        next = 0; // Loop back to start
                     } else {
+                        // Repeat Off
                         app->playing = false; 
                         app->track_idx = 0;   
                         break;
