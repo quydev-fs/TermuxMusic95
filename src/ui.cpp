@@ -8,6 +8,8 @@
 #include <cstdio>
 #include <iostream>
 #include <vector>
+#include <limits.h> // Required for PATH_MAX
+#include <string>   // Required for string manipulation
 
 // --- IMAGE LOADER IMPLEMENTATION ---
 #define STB_IMAGE_IMPLEMENTATION
@@ -17,10 +19,7 @@ UI::UI(AppState* state) : app(state), dpy(nullptr) {}
 
 UI::~UI() {
     if (logoImg) {
-        // XDestroyImage frees the data structure, but we must be careful 
-        // if we allocated the data buffer manually. 
-        // Usually XDestroyImage frees the .data pointer too.
-        logoImg->data = NULL; // Prevent double free if we manage data
+        logoImg->data = NULL; 
         XDestroyImage(logoImg);
     }
     if (dpy) {
@@ -34,13 +33,11 @@ bool UI::init() {
     if (!dpy) return false;
     
     int screen = DefaultScreen(dpy);
-    // Create Window
     win = XCreateSimpleWindow(dpy, RootWindow(dpy, screen), 10, 10, W_WIDTH, W_HEIGHT, 0, 0, 0);
     
     XSelectInput(dpy, win, ExposureMask | ButtonPressMask | Button1MotionMask | KeyPressMask);
     XStoreName(dpy, win, "TermuxMusic95");
     
-    // Size Hints (Fixed size)
     XSizeHints* hints = XAllocSizeHints();
     hints->flags = PMinSize | PMaxSize;
     hints->min_width = hints->max_width = W_WIDTH;
@@ -48,42 +45,69 @@ bool UI::init() {
     XSetWMNormalHints(dpy, win, hints);
     XFree(hints);
     
-    // Close Handler
     wmDeleteMessage = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(dpy, win, &wmDeleteMessage, 1);
     
     XMapWindow(dpy, win);
     gc = XCreateGC(dpy, win, 0, NULL);
 
-    // --- LOAD LOGO & SET ICON ---
     loadLogo();
 
     return true;
 }
 
+// --- PATH RESOLUTION HELPER ---
+std::string getAssetPath(const std::string& assetName) {
+    char result[PATH_MAX];
+    ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
+    
+    std::string fullPath;
+    if (count != -1) {
+        // This gives us the full path to the executable
+        // e.g., /home/user/TermuxMusic95/build/bin/TermuxMusic95
+        std::string exePath(result, count);
+        
+        // Remove the executable name
+        size_t lastSlash = exePath.find_last_of("/");
+        std::string binDir = exePath.substr(0, lastSlash);
+        
+        // Construct path: binDir + /../../assets/ + assetName
+        // We go up two levels because binary is in build/bin/
+        fullPath = binDir + "/../../assets/icons/" + assetName;
+    } else {
+        // Fallback to relative path if readlink fails
+        fullPath = "assets/icons/" + assetName;
+    }
+    return fullPath;
+}
+
 void UI::loadLogo() {
     int w, h, channels;
-    unsigned char* data = stbi_load("assets/logo.jpg", &w, &h, &channels, 4); // Force 4 channels (RGBA)
+    
+    // USE THE HELPER FUNCTION HERE
+    std::string logoPath = getAssetPath("logo.jpg");
+    
+    // Debug print to verify path
+    // std::cout << "Loading logo from: " << logoPath << std::endl;
+
+    unsigned char* data = stbi_load(logoPath.c_str(), &w, &h, &channels, 4); 
     
     if (!data) {
-        std::cerr << "Warning: Could not load assets/logo.jpg" << std::endl;
-        return;
+        // Fallback: Try current directory just in case
+        data = stbi_load("assets/icons/logo.jpg", &w, &h, &channels, 4);
+        if (!data) {
+            std::cerr << "Warning: Could not load logo from " << logoPath << std::endl;
+            return;
+        }
     }
 
     logoW = w;
     logoH = h;
 
-    // 1. PREPARE FOR TITLE BAR (XImage)
-    // X11 usually expects BGRA (Little Endian) or ARGB (Big Endian). 
-    // Most Android/Termux X11 servers are Little Endian (BGRA).
-    // stbi gives us R G B A. We need to swap R and B.
-    
-    // We allocate a buffer for the XImage
     char* xImageData = (char*)malloc(w * h * 4);
-    
-    // We also prepare a buffer for the _NET_WM_ICON (Needs ARGB unsigned long)
-    // Format: [width, height, p1, p2, p3...]
     std::vector<unsigned long> iconData;
+    
+    // Format: Width, Height, ARGB Data...
     iconData.push_back(w);
     iconData.push_back(h);
     
@@ -93,22 +117,19 @@ void UI::loadLogo() {
         unsigned char b = data[i*4 + 2];
         unsigned char a = data[i*4 + 3];
 
-        // XImage Buffer (BGRA for display)
+        // BGRA for XImage
         xImageData[i*4 + 0] = b;
         xImageData[i*4 + 1] = g;
         xImageData[i*4 + 2] = r;
-        xImageData[i*4 + 3] = a; // Alpha usually ignored in SimpleWindow but good to have
+        xImageData[i*4 + 3] = a;
 
-        // Icon Buffer (ARGB for Dock)
-        // _NET_WM_ICON expects 32-bit integers in ARGB format
+        // ARGB for Dock Icon
         unsigned long argb = ((unsigned long)a << 24) | ((unsigned long)r << 16) | ((unsigned long)g << 8) | b;
         iconData.push_back(argb);
     }
 
-    // Create XImage for drawing inside the app
     logoImg = XCreateImage(dpy, DefaultVisual(dpy, 0), 24, ZPixmap, 0, xImageData, w, h, 32, 0);
 
-    // 2. SET DOCK/TASKBAR ICON (_NET_WM_ICON)
     Atom netWmIcon = XInternAtom(dpy, "_NET_WM_ICON", False);
     Atom cardinal = XInternAtom(dpy, "CARDINAL", False);
     
@@ -141,23 +162,13 @@ void UI::drawText(int x, int y, const char* str, unsigned long color) {
 }
 
 void UI::render() {
-    // Main Background
     XSetForeground(dpy, gc, C_FACE);
     XFillRectangle(dpy, win, gc, 0, 0, W_WIDTH, W_HEIGHT);
     
-    // --- TITLE BAR DRAWING ---
     XSetForeground(dpy, gc, C_TITLE_BG);
     XFillRectangle(dpy, win, gc, 0, 0, W_WIDTH, 14);
     
-    // DRAW LOGO ON TITLE BAR
     if (logoImg) {
-        // Draw logo at (2, 2) with size 10x10 (scaled or clipped? XPutImage clips)
-        // Ideally your logo.jpg should be small (e.g., 16x16 or 32x32).
-        // If it's huge, it will cover the app. Let's assume it is resized or we clip it.
-        // Winamp logo is usually top left.
-        
-        // We copy the image to the window. 
-        // Source X,Y = 0,0. Dest X,Y = 2,1. Width/Height = min(logoW, 12) to fit bar.
         int drawW = std::min(logoW, 12);
         int drawH = std::min(logoH, 12);
         XPutImage(dpy, win, gc, logoImg, 0, 0, 3, 1, drawW, drawH);
@@ -165,16 +176,14 @@ void UI::render() {
 
     drawBevel(0, 0, W_WIDTH, 14, false);
     
-    // Title Text (Shifted slightly right to make room for logo)
     static int scroll_x = 0;
     static int scroll_tick = 0;
     std::string disp = app->current_title + " *** " + app->current_title;
     if (++scroll_tick % 5 == 0) scroll_x++;
     if (scroll_x > (int)app->current_title.length() * 7) scroll_x = 0;
     std::string sub = disp.substr(scroll_x / 7, 30);
-    drawText(20, 11, sub.c_str(), 0xFFFFFF); // X changed from 10 to 20
+    drawText(20, 11, sub.c_str(), 0xFFFFFF);
     
-    // --- REST OF UI (Unchanged) ---
     XSetForeground(dpy, gc, C_VIS_BG);
     XFillRectangle(dpy, win, gc, 20, 24, 76, 16);
     drawBevel(19, 23, 78, 18, true);
@@ -228,7 +237,6 @@ void UI::render() {
     drawButton(85, by, 20, 18, "[]", false);
     drawButton(108, by, 20, 18, ">|", false);
 
-    // Shuffle/Repeat/Save
     drawButton(200, 90, 20, 12, "SH", app->shuffle);
     const char* rpLabel = (app->repeatMode == REP_ONE) ? "1" : (app->repeatMode == REP_ALL ? "AL" : "RP");
     drawButton(225, 90, 20, 12, rpLabel, app->repeatMode != REP_OFF);
