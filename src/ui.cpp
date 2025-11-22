@@ -62,6 +62,7 @@ std::string getAssetPath(const std::string& assetName) {
         std::string exePath(result, count);
         size_t lastSlash = exePath.find_last_of("/");
         std::string binDir = exePath.substr(0, lastSlash);
+        // --- FIX: Path now points to icons folder ---
         fullPath = binDir + "/../../assets/icons/" + assetName;
     } else {
         fullPath = "assets/icons/" + assetName;
@@ -74,6 +75,7 @@ void UI::loadLogo() {
     std::string logoPath = getAssetPath("logo.jpg");
     unsigned char* data = stbi_load(logoPath.c_str(), &w, &h, &channels, 4); 
     if (!data) {
+        // Fallback check in case structure is different
         data = stbi_load("assets/icons/logo.jpg", &w, &h, &channels, 4);
         if (!data) return;
     }
@@ -204,15 +206,12 @@ void UI::render() {
     drawButton(85, by, 20, 18, "[]", false);
     drawButton(108, by, 20, 18, ">|", false); 
 
-    // 3. Option Buttons
     drawButton(200, 90, 20, 12, "SH", app->shuffle);
     const char* rpLabel = (app->repeatMode == REP_ONE) ? "1" : (app->repeatMode == REP_ALL ? "AL" : "RP");
     drawButton(225, 90, 20, 12, rpLabel, app->repeatMode != REP_OFF);
     
-    // --- NEW BUTTONS: OPEN (OP) and PLAYLIST (PL) ---
-    // We replace SV with OP, add PL.
-    drawButton(250, 90, 10, 12, "O", false); // Open (tiny button)
-    drawButton(262, 90, 10, 12, "P", false); // Playlist (tiny button)
+    drawButton(250, 90, 10, 12, "O", false); // Open
+    drawButton(262, 90, 10, 12, "P", false); // Playlist
 }
 
 void UI::handleInput(int raw_x, int raw_y) {
@@ -237,10 +236,10 @@ void UI::handleInput(int raw_x, int raw_y) {
             mode = (mode + 1) % 3;
             app->repeatMode = mode;
         }
-        else if (x >= 250 && x <= 260) { // "O" Open File
+        else if (x >= 250 && x <= 260) { 
             fileBrowser->show();
         }
-        else if (x >= 262 && x <= 272) { // "P" Playlist
+        else if (x >= 262 && x <= 272) { 
             plViewer->show();
         }
     }
@@ -278,9 +277,7 @@ void UI::runLoop() {
         if (XPending(dpy)) {
             XNextEvent(dpy, &e);
             
-            // DISPATCH EVENTS TO CORRECT WINDOWS
             if (e.xany.window == win) {
-                // Main Window Event
                 if (e.type == ClientMessage && (unsigned long)e.xclient.data.l[0] == wmDeleteMessage) app->running = false;
                 else if (e.type == Expose) render();
                 else if (e.type == ButtonPress) { handleInput(e.xbutton.x, e.xbutton.y); render(); }
