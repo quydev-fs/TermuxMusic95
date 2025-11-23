@@ -1,39 +1,39 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#include <gtk/gtk.h>
 #include <string>
 #include <vector>
-#include <atomic>
+#include <gtk/gtk.h>
 
-// Winamp Aesthetic Constants
+// UI Colors (Dark Theme)
 #define WINAMP_BG_COLOR "#282828"
-#define WINAMP_FG_COLOR "#00E200"
-#define WINAMP_BTN_COLOR "#454545"
+#define WINAMP_BTN_COLOR "#333333"
+#define WINAMP_FG_COLOR "#00FF00" // Neon green
 
+// Repeat Modes
 enum RepeatMode {
     REP_OFF = 0,
     REP_ONE = 1,
     REP_ALL = 2
 };
 
+// Application State
 struct AppState {
-    // Playback State
+    // Playback
     bool playing = false;
     bool paused = false;
     
-    // Advanced Playback
-    bool shuffle = false;
-    int repeatMode = REP_OFF;
-    
-    // Audio Data
+    // Playlist
     std::vector<std::string> playlist;
-    std::vector<size_t> play_order; // The missing member!
-    int current_track_idx = -1;     // Index into play_order
-    double volume = 1.0;
+    std::vector<size_t> play_order; // Handles shuffling
+    int current_track_idx = -1;
     
-    // Visualizer Data
-    // (GTK visualizer generates this on the fly, but we keep the struct clean)
+    // Modes
+    RepeatMode repeatMode = REP_OFF;
+    bool shuffle = false;
+    
+    // --- NEW: MINI MODE FLAG ---
+    bool mini_mode = false;
 };
 
 #endif

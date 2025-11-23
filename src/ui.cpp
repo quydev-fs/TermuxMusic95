@@ -12,6 +12,7 @@ UI::UI(int argc, char** argv) {
     gtk_init(&argc, &argv);
 }
 
+// --- HELPERS ---
 std::string getAssetPath(const std::string& assetName) {
     char result[PATH_MAX];
     ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
@@ -28,41 +29,39 @@ void UI::loadLogo() {
     gtk_window_set_icon_from_file(GTK_WINDOW(window), logoPath.c_str(), NULL);
 }
 
-// --- BUTTON LOGIC (SHUFFLE & REPEAT) ---
+// --- NEW: MINI MODE LOGIC ---
+void UI::toggleMiniMode(bool force_resize) {
+    is_mini_mode = !is_mini_mode;
 
-void UI::onShuffleClicked(GtkButton* b, gpointer d) {
-    UI* ui = (UI*)d;
-    ui->playlistMgr->toggleShuffle();
-    
-    // Visual Feedback
-    GtkStyleContext *context = gtk_widget_get_style_context(ui->btnShuffle);
-    if (ui->appState.shuffle) {
-        gtk_style_context_add_class(context, "active-mode");
+    // 1. Toggle Visibility of Widgets
+    if (is_mini_mode) {
+        gtk_widget_hide(playlistBox);    // Hide Playlist
+        gtk_widget_hide(drawingArea);    // Hide Visualizer
+        gtk_widget_hide(lblInfo);        // Hide Info Label
+        gtk_widget_hide(seekScale);      // Hide Seek Bar
     } else {
-        gtk_style_context_remove_class(context, "active-mode");
+        gtk_widget_show(playlistBox);    // Show Playlist
+        gtk_widget_show(drawingArea);    // Show Visualizer
+        gtk_widget_show(lblInfo);        // Show Info Label
+        gtk_widget_show(seekScale);      // Show Seek Bar
+    }
+    
+    // 2. Adjust Window Size
+    // Hiding/showing widgets in a GtkBox is usually enough for auto-shrink,
+    // but we can enforce minimum size request if needed.
+    // However, the cleanest GTK way is to simply hide the expanders.
+    
+    // Disable the vertical expander on the playlist container (scrolled window)
+    // to allow the window to shrink to fit the visible controls/volume/etc.
+    GtkWidget* scrolled = gtk_widget_get_parent(playlistBox);
+    if (scrolled) {
+        gtk_widget_set_vexpand(scrolled, !is_mini_mode);
+        gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(scrolled), is_mini_mode ? 0 : 150);
     }
 }
 
-void UI::onRepeatClicked(GtkButton* b, gpointer d) {
-    UI* ui = (UI*)d;
-    ui->playlistMgr->toggleRepeat();
-    
-    // Visual Feedback: Cycle Labels
-    GtkStyleContext *context = gtk_widget_get_style_context(ui->btnRepeat);
-    switch(ui->appState.repeatMode) {
-        case REP_OFF: 
-            gtk_button_set_label(GTK_BUTTON(ui->btnRepeat), "R"); 
-            gtk_style_context_remove_class(context, "active-mode");
-            break;
-        case REP_ALL: 
-            gtk_button_set_label(GTK_BUTTON(ui->btnRepeat), "R-A"); 
-            gtk_style_context_add_class(context, "active-mode");
-            break;
-        case REP_ONE: 
-            gtk_button_set_label(GTK_BUTTON(ui->btnRepeat), "R-1"); 
-            gtk_style_context_add_class(context, "active-mode");
-            break;
-    }
+void UI::onMiniModeClicked(GtkButton* btn, gpointer data) {
+    ((UI*)data)->toggleMiniMode();
 }
 
 // --- STYLING (WINAMP 3D EFFECT) ---
@@ -72,27 +71,24 @@ void UI::initCSS() {
         ".tm-window { background-color: " WINAMP_BG_COLOR "; font-size: 12px; }"
         ".tm-window label { color: " WINAMP_FG_COLOR "; font-family: 'Monospace'; font-weight: bold; }"
         
-        // BUTTON STYLES
         ".tm-window button { "
         "   background-image: none; "
         "   background-color: " WINAMP_BTN_COLOR "; "
         "   color: #cccccc; "
         "   border: 2px solid; "
-        "   border-color: #606060 #202020 #202020 #606060; " // Raised 3D Bevel (Light Top/Left, Dark Bot/Right)
+        "   border-color: #606060 #202020 #202020 #606060; "
         "   padding: 1px 5px; "
         "   min-height: 20px; "
         "   margin: 1px; "
-        "   border-radius: 0px; " // Sharp corners
+        "   border-radius: 0px; "
         "}"
         
-        // CLICK EFFECT (Inset)
         ".tm-window button:active { "
         "   background-color: #353535; "
-        "   border-color: #202020 #606060 #606060 #202020; " // Inverted Bevel (Dark Top/Left)
+        "   border-color: #202020 #606060 #606060 #202020; " 
         "   color: white; "
         "}"
         
-        // ACTIVE MODE (Green Text for Active Shuffle/Repeat)
         ".tm-window button.active-mode { "
         "   color: " WINAMP_FG_COLOR "; "
         "   font-weight: bold; "
@@ -126,13 +122,16 @@ void UI::buildWidgets() {
     gtk_container_set_border_width(GTK_CONTAINER(mainBox), 5);
     gtk_container_add(GTK_CONTAINER(window), mainBox);
 
+    // 1. Visualizer
     drawingArea = gtk_drawing_area_new();
     gtk_widget_set_size_request(drawingArea, -1, 40); 
     gtk_box_pack_start(GTK_BOX(mainBox), drawingArea, FALSE, FALSE, 0);
 
+    // 2. Info Label
     lblInfo = gtk_label_new("Ready");
     gtk_box_pack_start(GTK_BOX(mainBox), lblInfo, FALSE, FALSE, 2);
 
+    // 3. Seek Bar
     seekScale = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 0, 100, 1);
     gtk_scale_set_draw_value(GTK_SCALE(seekScale), FALSE);
     gtk_box_pack_start(GTK_BOX(mainBox), seekScale, FALSE, FALSE, 2);
@@ -141,6 +140,7 @@ void UI::buildWidgets() {
     g_signal_connect(seekScale, "button-release-event", G_CALLBACK(onSeekRelease), this);
     g_signal_connect(seekScale, "value-changed", G_CALLBACK(onSeekChanged), this);
 
+    // 4. Volume Bar
     GtkWidget* volBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
     GtkWidget* lblVol = gtk_label_new("Vol:");
     volScale = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 0, 100, 1);
@@ -152,7 +152,8 @@ void UI::buildWidgets() {
     gtk_box_pack_start(GTK_BOX(mainBox), volBox, FALSE, FALSE, 2);
     g_signal_connect(volScale, "value-changed", G_CALLBACK(onVolumeChanged), this);
 
-    GtkWidget* controlsBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0); // 0 spacing, padding handles it
+    // 5. Controls
+    GtkWidget* controlsBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     
     GtkWidget* btnPrev = gtk_button_new_with_label("|<");
     GtkWidget* btnPlay = gtk_button_new_with_label("|>");
@@ -161,10 +162,9 @@ void UI::buildWidgets() {
     GtkWidget* btnNext = gtk_button_new_with_label(">|");
     GtkWidget* btnAdd = gtk_button_new_with_label("+");   
     GtkWidget* btnClear = gtk_button_new_with_label("C"); 
-    
-    // NEW: Shuffle and Repeat Buttons
-    btnShuffle = gtk_button_new_with_label("S"); // S for Shuffle
-    btnRepeat = gtk_button_new_with_label("R");  // R for Repeat
+    btnShuffle = gtk_button_new_with_label("S");
+    btnRepeat = gtk_button_new_with_label("R");
+    btnMiniMode = gtk_button_new_with_label("M"); // NEW BUTTON
 
     gtk_box_pack_start(GTK_BOX(controlsBox), btnPrev, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(controlsBox), btnPlay, TRUE, TRUE, 0);
@@ -172,20 +172,23 @@ void UI::buildWidgets() {
     gtk_box_pack_start(GTK_BOX(controlsBox), btnStop, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(controlsBox), btnNext, TRUE, TRUE, 0);
     
-    // Group Extras
     gtk_box_pack_start(GTK_BOX(controlsBox), btnShuffle, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(controlsBox), btnRepeat, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(controlsBox), btnMiniMode, TRUE, TRUE, 0); // PACK NEW BUTTON
     gtk_box_pack_start(GTK_BOX(controlsBox), btnAdd, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(controlsBox), btnClear, TRUE, TRUE, 0);
 
     gtk_box_pack_start(GTK_BOX(mainBox), controlsBox, FALSE, FALSE, 2);
 
+    // 6. Playlist (Scrolled Window needs vexpand=TRUE for full mode)
     GtkWidget* scrolled = gtk_scrolled_window_new(NULL, NULL);
-    gtk_widget_set_vexpand(scrolled, TRUE);
+    gtk_widget_set_vexpand(scrolled, TRUE); 
+    gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(scrolled), 150); // Set minimum height for full mode
     playlistBox = gtk_list_box_new();
     gtk_container_add(GTK_CONTAINER(scrolled), playlistBox);
     gtk_box_pack_start(GTK_BOX(mainBox), scrolled, TRUE, TRUE, 0);
 
+    // Signals
     g_signal_connect(btnPlay, "clicked", G_CALLBACK(onPlayClicked), this);
     g_signal_connect(btnPause, "clicked", G_CALLBACK(onPauseClicked), this);
     g_signal_connect(btnStop, "clicked", G_CALLBACK(onStopClicked), this);
@@ -193,17 +196,16 @@ void UI::buildWidgets() {
     g_signal_connect(btnClear, "clicked", G_CALLBACK(onClearClicked), this);
     g_signal_connect(btnPrev, "clicked", G_CALLBACK(onPrevClicked), this);
     g_signal_connect(btnNext, "clicked", G_CALLBACK(onNextClicked), this);
-    
-    // New Signals
     g_signal_connect(btnShuffle, "clicked", G_CALLBACK(onShuffleClicked), this);
     g_signal_connect(btnRepeat, "clicked", G_CALLBACK(onRepeatClicked), this);
+    g_signal_connect(btnMiniMode, "clicked", G_CALLBACK(onMiniModeClicked), this); // NEW SIGNAL
     
     g_signal_connect(drawingArea, "draw", G_CALLBACK(Visualizer::onDraw), &appState);
     
     loadLogo();
 }
 
-// --- REST OF CALLBACKS ---
+// --- REST OF CALLBACKS (Unchanged) ---
 void UI::onPlayClicked(GtkButton* b, gpointer d) { 
     UI* ui = (UI*)d;
     if (ui->appState.playlist.empty()) return;
@@ -220,6 +222,35 @@ void UI::onAddClicked(GtkButton* b, gpointer d) { ((UI*)d)->playlistMgr->addFile
 void UI::onClearClicked(GtkButton* b, gpointer d) { ((UI*)d)->playlistMgr->clear(); }
 void UI::onPrevClicked(GtkButton* b, gpointer d) { ((UI*)d)->playlistMgr->playPrev(); }
 void UI::onNextClicked(GtkButton* b, gpointer d) { ((UI*)d)->playlistMgr->playNext(); }
+
+void UI::onShuffleClicked(GtkButton* b, gpointer d) {
+    UI* ui = (UI*)d;
+    ui->playlistMgr->toggleShuffle();
+    GtkStyleContext *context = gtk_widget_get_style_context(ui->btnShuffle);
+    if (ui->appState.shuffle) gtk_style_context_add_class(context, "active-mode");
+    else gtk_style_context_remove_class(context, "active-mode");
+}
+
+void UI::onRepeatClicked(GtkButton* b, gpointer d) {
+    UI* ui = (UI*)d;
+    ui->playlistMgr->toggleRepeat();
+    GtkStyleContext *context = gtk_widget_get_style_context(ui->btnRepeat);
+    switch(ui->appState.repeatMode) {
+        case REP_OFF: 
+            gtk_button_set_label(GTK_BUTTON(ui->btnRepeat), "R"); 
+            gtk_style_context_remove_class(context, "active-mode");
+            break;
+        case REP_ALL: 
+            gtk_button_set_label(GTK_BUTTON(ui->btnRepeat), "R-A"); 
+            gtk_style_context_add_class(context, "active-mode");
+            break;
+        case REP_ONE: 
+            gtk_button_set_label(GTK_BUTTON(ui->btnRepeat), "R-1"); 
+            gtk_style_context_add_class(context, "active-mode");
+            break;
+    }
+}
+
 void UI::onVolumeChanged(GtkRange* range, gpointer data) { ((UI*)data)->player->setVolume(gtk_range_get_value(range) / 100.0); }
 gboolean UI::onSeekPress(GtkWidget* w, GdkEvent* e, gpointer d) { ((UI*)d)->isSeeking = true; return FALSE; }
 gboolean UI::onSeekRelease(GtkWidget* w, GdkEvent* e, gpointer d) { 
@@ -233,7 +264,10 @@ void UI::onSeekChanged(GtkRange* range, gpointer data) {
 
 gboolean UI::onUpdateTick(gpointer data) {
     UI* ui = (UI*)data;
-    gtk_widget_queue_draw(ui->drawingArea);
+    if (!ui->is_mini_mode) { // Only redraw visualizer if visible
+        gtk_widget_queue_draw(ui->drawingArea);
+    }
+    
     if (ui->player && ui->appState.playing) {
         double current = ui->player->getPosition();
         double duration = ui->player->getDuration();
@@ -259,6 +293,7 @@ gboolean UI::onKeyPress(GtkWidget* widget, GdkEventKey* event, gpointer data) {
         case GDK_KEY_Down: ui->playlistMgr->selectNext(); return TRUE;
         case GDK_KEY_Delete: ui->playlistMgr->deleteSelected(); return TRUE;
         case GDK_KEY_space: if(ui->appState.playing) ui->player->pause(); else UI::onPlayClicked(NULL, ui); return TRUE;
+        case GDK_KEY_M: ui->toggleMiniMode(); return TRUE; // M key for Mini Mode
         case GDK_KEY_Return: {
              GtkListBoxRow* row = gtk_list_box_get_selected_row(GTK_LIST_BOX(ui->playlistBox));
              if(row) ui->playlistMgr->onRowActivated(GTK_LIST_BOX(ui->playlistBox), row);

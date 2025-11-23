@@ -16,6 +16,11 @@ private:
     void buildWidgets();
     void loadLogo();
     
+    // --- Mode Control ---
+    void toggleMiniMode(bool force_resize = false); // Helper function
+    static void onMiniModeClicked(GtkButton* btn, gpointer data);
+
+    // --- Signal Handlers ---
     static void onPlayClicked(GtkButton* btn, gpointer data);
     static void onPauseClicked(GtkButton* btn, gpointer data);
     static void onStopClicked(GtkButton* btn, gpointer data);
@@ -23,8 +28,6 @@ private:
     static void onClearClicked(GtkButton* btn, gpointer data);
     static void onPrevClicked(GtkButton* btn, gpointer data);
     static void onNextClicked(GtkButton* btn, gpointer data);
-    
-    // NEW HANDLERS
     static void onShuffleClicked(GtkButton* btn, gpointer data);
     static void onRepeatClicked(GtkButton* btn, gpointer data);
     
@@ -35,23 +38,26 @@ private:
     static gboolean onUpdateTick(gpointer data);
     static gboolean onKeyPress(GtkWidget* widget, GdkEventKey* event, gpointer data);
 
+    // --- Members ---
     AppState appState;
     Player* player;
     PlaylistManager* playlistMgr;
     Visualizer* visualizer;
 
+    // Widgets
     GtkWidget* window;
     GtkWidget* drawingArea; 
     GtkWidget* playlistBox; 
     GtkWidget* lblInfo;
     GtkWidget* seekScale;
     GtkWidget* volScale;
-    
-    // NEW BUTTON REFERENCES (To change text/color)
     GtkWidget* btnShuffle;
     GtkWidget* btnRepeat;
-    
+    GtkWidget* btnMiniMode; // NEW
+
+    // State
     bool isSeeking = false;
+    bool is_mini_mode = false; // NEW
 };
 
 #endif
