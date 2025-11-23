@@ -1,12 +1,20 @@
 #ifndef VISUALIZER_H
 #define VISUALIZER_H
 
-#include <complex>
-#include <valarray>
+#include "common.h"
 
-typedef std::complex<double> Cpx;
-typedef std::valarray<Cpx> CArray;
+class Visualizer {
+public:
+    Visualizer(AppState* state);
+    
+    // GTK Drawing Callback
+    static gboolean onDraw(GtkWidget* widget, cairo_t* cr, gpointer data);
+    
+    // Timer for updates
+    static gboolean onTick(gpointer widget);
 
-void computeFFT(CArray& x);
+private:
+    AppState* app;
+};
 
 #endif

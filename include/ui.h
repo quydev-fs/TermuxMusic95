@@ -2,42 +2,42 @@
 #define UI_H
 
 #include "common.h"
-#include "aux_windows.h" // Include new header
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xatom.h> 
+#include "player.h"
+#include "playlist.h"
+#include "visualizer.h"
 
 class UI {
 public:
-    UI(AppState* state);
-    ~UI();
-    bool init();
-    void runLoop();
+    UI(int argc, char** argv);
+    int run();
 
 private:
-    void render();
-    void handleInput(int x, int y);
-    void handleKey(KeySym ks);
-    void loadLogo();
-
-    void drawBevel(int x, int y, int w, int h, bool sunken);
-    void drawButton(int x, int y, int w, int h, const char* label, bool pressed);
-    void drawText(int x, int y, const char* str, unsigned long color);
-
-    AppState* app;
-    Display* dpy;
-    Window win;
-    GC gc;
-    Atom wmDeleteMessage;
+    void initCSS();
+    void buildWidgets();
     
-    // Logo
-    XImage* logoImg = nullptr; 
-    int logoW = 0;
-    int logoH = 0;
+    // --- Signal Handlers ---
+    static void onPlayClicked(GtkButton* btn, gpointer data);
+    static void onPauseClicked(GtkButton* btn, gpointer data);
+    static void onStopClicked(GtkButton* btn, gpointer data);
+    static void onAddClicked(GtkButton* btn, gpointer data);
+    static void onClearClicked(GtkButton* btn, gpointer data); // New Clear Handler
+    static void onPrevClicked(GtkButton* btn, gpointer data);
+    static void onNextClicked(GtkButton* btn, gpointer data);
+    
+    // Key Press Handler (Keyboard Navigation)
+    static gboolean onKeyPress(GtkWidget* widget, GdkEventKey* event, gpointer data);
 
-    // New Auxiliary Windows
-    PlaylistViewer* plViewer = nullptr;
-    FileBrowser* fileBrowser = nullptr;
+    // --- Members ---
+    AppState appState;
+    Player* player;
+    PlaylistManager* playlistMgr;
+    Visualizer* visualizer;
+
+    // Widgets
+    GtkWidget* window;
+    GtkWidget* drawingArea; // The Visualizer Canvas
+    GtkWidget* playlistBox; // The List
+    GtkWidget* lblInfo;     // Status Text
 };
 
 #endif

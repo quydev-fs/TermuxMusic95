@@ -2,18 +2,27 @@
 #define PLAYLIST_H
 
 #include "common.h"
-#include <string>
+#include "player.h"
 
-// File Operations
-void loadPlaylist(AppState& app, int argc, char** argv);
-bool savePlaylist(const AppState& app, std::string filename = "");
-void clearPlaylist(AppState& app); // <--- NEW
+class PlaylistManager {
+public:
+    PlaylistManager(AppState* state, Player* player, GtkWidget* listBox);
+    
+    void addFiles();
+    void clear(); // Added for your "Clear Playlist" request
+    void onRowActivated(GtkListBox* box, GtkListBoxRow* row);
+    void refreshUI();
+    
+    // Selection/Keyboard helpers
+    void selectNext();
+    void selectPrev();
+    void deleteSelected();
 
-// Playback Logic
-void toggleShuffle(AppState& app);
-
-// Navigation Logic
-void playNext(AppState& app, bool forceChange = false);
-void playPrevious(AppState& app);
+private:
+    AppState* app;
+    Player* player;
+    GtkWidget* listBox; 
+    GtkWidget* parentWindow;
+};
 
 #endif

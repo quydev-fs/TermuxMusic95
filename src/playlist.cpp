@@ -1,187 +1,184 @@
 #include "playlist.h"
-#include <sys/stat.h>
-#include <dirent.h>
-#include <algorithm>
-#include <cstdio>
-#include <fstream>
-#include <ctime>
 #include <iostream>
-#include <iomanip>
-#include <numeric> 
-#include <random>  
-#include <chrono>  
-#include <sstream>
+#include <numeric>
+#include <algorithm>
+#include <random>
+#include <chrono>
 
-void loadPlaylist(AppState& app, int argc, char** argv) {
-    if (argc < 2) return;
+PlaylistManager::PlaylistManager(AppState* state, Player* pl, GtkWidget* list) 
+    : app(state), player(pl), listBox(list) {
+    
+    // Find parent window for dialogs
+    parentWindow = gtk_widget_get_toplevel(listBox);
+}
 
-    app.playlist.clear();
-    app.play_order.clear();
+void PlaylistManager::addFiles() {
+    GtkWidget *dialog;
+    GtkFileChooserAction action = GTK_FILE_CHOOSER_ACTION_OPEN;
 
-    struct stat s;
-    if (stat(argv[1], &s) == 0) {
-        if (s.st_mode & S_IFDIR) {
-            DIR *dir; struct dirent *ent;
-            if ((dir = opendir(argv[1])) != NULL) {
-                while ((ent = readdir(dir)) != NULL) {
-                    std::string fname = ent->d_name;
-                    if(fname.length() > 4 && fname.substr(fname.length()-4) == ".mp3") {
-                         app.playlist.push_back(std::string(argv[1]) + "/" + fname);
-                    }
+    dialog = gtk_file_chooser_dialog_new("Add Music",
+                                         GTK_WINDOW(parentWindow),
+                                         action,
+                                         "_Cancel",
+                                         GTK_RESPONSE_CANCEL,
+                                         "_Open",
+                                         GTK_RESPONSE_ACCEPT,
+                                         NULL);
+    
+    // Allow multiple selection
+    gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog), TRUE);
+
+    // Filter for Audio
+    GtkFileFilter* filter = gtk_file_filter_new();
+    gtk_file_filter_set_name(filter, "Audio Files");
+    gtk_file_filter_add_pattern(filter, "*.mp3");
+    gtk_file_filter_add_pattern(filter, "*.wav");
+    gtk_file_filter_add_pattern(filter, "*.ogg");
+    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter);
+
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+        GSList *filenames = gtk_file_chooser_get_filenames(GTK_FILE_CHOOSER(dialog));
+        GSList *iter;
+        
+        size_t oldSize = app->playlist.size();
+        
+        for (iter = filenames; iter; iter = iter->next) {
+            char *filename = (char *)iter->data;
+            app->playlist.push_back(std::string(filename));
+            g_free(filename);
+        }
+        g_slist_free(filenames);
+        
+        // Update Play Order
+        size_t newSize = app->playlist.size();
+        app->play_order.resize(newSize);
+        // Fill new slots with sequential indices
+        for(size_t i = oldSize; i < newSize; i++) {
+            app->play_order[i] = i;
+        }
+        
+        // If shuffle is on, we should technically re-shuffle, 
+        // but appending is safer for currently playing tracks.
+
+        refreshUI();
+    }
+
+    gtk_widget_destroy(dialog);
+}
+
+void PlaylistManager::clear() {
+    // Stop playback
+    player->stop();
+    
+    // Clear Data
+    app->playlist.clear();
+    app->play_order.clear();
+    app->current_track_idx = -1;
+    app->playing = false;
+    app->paused = false;
+    
+    // Refresh UI (Empty List)
+    refreshUI();
+}
+
+void PlaylistManager::refreshUI() {
+    // Clear existing widgets in the listbox
+    GList *children, *iter;
+    children = gtk_container_get_children(GTK_CONTAINER(listBox));
+    for (iter = children; iter != NULL; iter = g_list_next(iter)) {
+        gtk_widget_destroy(GTK_WIDGET(iter->data));
+    }
+    g_list_free(children);
+
+    // Add new items
+    for (size_t i = 0; i < app->playlist.size(); i++) {
+        // We display items in their storage order (0, 1, 2...)
+        // even if shuffle plays them in random order (5, 2, 9...)
+        std::string path = app->playlist[i];
+        
+        size_t lastSlash = path.find_last_of("/");
+        std::string name = (lastSlash != std::string::npos) ? path.substr(lastSlash + 1) : path;
+        
+        std::string labelStr = std::to_string(i + 1) + ". " + name;
+        
+        GtkWidget* label = gtk_label_new(labelStr.c_str());
+        gtk_label_set_xalign(GTK_LABEL(label), 0.0);
+        
+        // Highlight if currently playing
+        if (app->current_track_idx != -1 && 
+            (int)app->play_order[app->current_track_idx] == (int)i) {
+            // In GTK, we rely on row selection, but we can color text too
+            // This requires CSS or Markup, keeping it simple for now.
+        }
+        
+        gtk_container_add(GTK_CONTAINER(listBox), label);
+        gtk_widget_show(label);
+    }
+}
+
+void PlaylistManager::onRowActivated(GtkListBox* box, GtkListBoxRow* row) {
+    int visual_index = gtk_list_box_row_get_index(row);
+    if (visual_index >= 0 && visual_index < (int)app->playlist.size()) {
+        
+        // Find where this visual index lives in the play_order
+        // If shuffle is OFF: play_order[i] == i.
+        // If shuffle is ON: we need to find 'visual_index' in 'play_order'.
+        
+        if (!app->shuffle) {
+            app->current_track_idx = visual_index;
+        } else {
+            // In shuffle mode, clicking a song forces it to play,
+            // usually resetting the shuffle order or finding it.
+            // Simple approach: Find it.
+            for(size_t i=0; i<app->play_order.size(); i++) {
+                if((int)app->play_order[i] == visual_index) {
+                    app->current_track_idx = i;
+                    break;
                 }
-                closedir(dir);
-            }
-        } else {
-            std::string arg = argv[1];
-            if (arg.substr(arg.length()-4) == ".m3u") {
-                FILE* f = fopen(arg.c_str(), "r");
-                char line[256];
-                while(fgets(line, sizeof(line), f)) {
-                    if(line[0] != '#') {
-                        std::string l = line;
-                        l.erase(std::remove(l.begin(), l.end(), '\n'), l.end());
-                        if(!l.empty()) app.playlist.push_back(l);
-                    }
-                }
-                fclose(f);
-            } else {
-                for(int i=1; i<argc; i++) app.playlist.push_back(argv[i]);
             }
         }
+
+        size_t real_file_index = app->play_order[app->current_track_idx];
+        player->load(app->playlist[real_file_index]);
+        player->play();
     }
-    std::sort(app.playlist.begin(), app.playlist.end());
-    
-    app.play_order.resize(app.playlist.size());
-    std::iota(app.play_order.begin(), app.play_order.end(), 0);
 }
 
-// --- NEW FUNCTION ---
-void clearPlaylist(AppState& app) {
-    app.playing = false;
-    app.paused = false;
-    
-    app.playlist.clear();
-    app.play_order.clear();
-    
-    app.track_idx = 0;
-    app.current_frame = 0;
-    app.total_frames = 0;
-    app.seek_pos = 0.0;
-    app.seek_request = false;
-    
-    app.current_title = "TermuxMusic95";
-    
-    // Reset visuals
-    for(int i=0; i<16; i++) app.viz_bands[i] = 0;
-    
-    std::cout << "Playlist Cleared." << std::endl;
-}
-
-void toggleShuffle(AppState& app) {
-    if (app.playlist.empty()) return;
-
-    // Fail-safe
-    if (app.play_order.size() != app.playlist.size()) {
-        app.play_order.resize(app.playlist.size());
-        std::iota(app.play_order.begin(), app.play_order.end(), 0);
-    }
-
-    size_t current_real_index = 0;
-    if (app.track_idx < app.play_order.size()) {
-        current_real_index = app.play_order[app.track_idx];
-    }
-
-    if (app.shuffle) {
-        unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-        std::mt19937 g(seed);
-        std::shuffle(app.play_order.begin(), app.play_order.end(), g);
-    } else {
-        std::iota(app.play_order.begin(), app.play_order.end(), 0);
-    }
-
-    for(size_t i=0; i<app.play_order.size(); i++) {
-        if(app.play_order[i] == current_real_index) {
-            app.track_idx = i;
-            break;
+void PlaylistManager::selectNext() {
+    GtkListBoxRow* row = gtk_list_box_get_selected_row(GTK_LIST_BOX(listBox));
+    if (row) {
+        int idx = gtk_list_box_row_get_index(row);
+        if (idx < (int)app->playlist.size() - 1) {
+            GtkListBoxRow* nextRow = gtk_list_box_get_row_at_index(GTK_LIST_BOX(listBox), idx + 1);
+            gtk_list_box_select_row(GTK_LIST_BOX(listBox), nextRow);
         }
     }
-    
-    std::cout << "Shuffle Toggled." << std::endl;
 }
 
-bool savePlaylist(const AppState& app, std::string filename) {
-    if (app.playlist.empty()) return false;
-
-    if (filename.empty()) {
-        auto t = std::time(nullptr);
-        auto tm = *std::localtime(&t);
-        std::ostringstream oss;
-        oss << "playlist_" << std::put_time(&tm, "%Y-%m-%d_%H%M%S") << ".m3u";
-        filename = oss.str();
-    }
-
-    std::ofstream file(filename);
-    if (!file.is_open()) return false;
-
-    file << "#EXTM3U" << std::endl;
-    for (const auto& track : app.playlist) {
-        file << track << std::endl;
-    }
-    file.close();
-    return true;
-}
-
-void playNext(AppState& app, bool forceChange) {
-    if (app.playlist.empty()) return;
-    
-    size_t next = app.track_idx + 1;
-
-    if (next >= app.playlist.size()) {
-        if (app.repeatMode == REP_ALL || (app.repeatMode == REP_ONE && forceChange)) {
-            next = 0; 
-        } else {
-            app.playing = false;
-            app.track_idx = 0; 
-            app.seek_pos = 0.0;
-            return;
+void PlaylistManager::selectPrev() {
+    GtkListBoxRow* row = gtk_list_box_get_selected_row(GTK_LIST_BOX(listBox));
+    if (row) {
+        int idx = gtk_list_box_row_get_index(row);
+        if (idx > 0) {
+            GtkListBoxRow* prevRow = gtk_list_box_get_row_at_index(GTK_LIST_BOX(listBox), idx - 1);
+            gtk_list_box_select_row(GTK_LIST_BOX(listBox), prevRow);
         }
     }
-    
-    app.track_idx = next;
-    app.playing = true;
-    app.paused = false;
-    app.seek_pos = 0.0;
-    app.seek_request = false;
 }
 
-void playPrevious(AppState& app) {
-    if (app.playlist.empty()) return;
-
-    double current_seconds = 0.0;
-    if (app.sample_rate > 0) {
-        current_seconds = (double)app.current_frame / (double)app.sample_rate;
-    }
-
-    if (current_seconds > 3.0) {
-        app.seek_pos = 0.0;
-        app.seek_request = true;
-        app.playing = true;
-        app.paused = false;
-        return;
-    }
-
-    if (app.track_idx > 0) {
-        app.track_idx--;
-    } else {
-        if (app.repeatMode == REP_ALL || app.repeatMode == REP_ONE) {
-            app.track_idx = app.playlist.size() - 1; 
-        } else {
-            app.track_idx = 0; 
-        }
-    }
-    
-    app.playing = true;
-    app.paused = false;
-    app.seek_pos = 0.0;
-    app.seek_request = false;
+void PlaylistManager::deleteSelected() {
+     GtkListBoxRow* row = gtk_list_box_get_selected_row(GTK_LIST_BOX(listBox));
+     if(row) {
+         int idx = gtk_list_box_row_get_index(row);
+         app->playlist.erase(app->playlist.begin() + idx);
+         // Also need to remove from play_order and rebalance
+         // For simplicity in this snippet, we just rebuild play_order linear
+         app->play_order.clear();
+         app->play_order.resize(app->playlist.size());
+         std::iota(app->play_order.begin(), app->play_order.end(), 0);
+         
+         app->current_track_idx = -1; // Stop playing to avoid crash
+         player->stop();
+         refreshUI();
+     }
 }
