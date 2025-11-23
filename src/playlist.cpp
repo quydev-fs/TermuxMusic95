@@ -1,5 +1,6 @@
 #include "playlist.h"
 #include <iostream>
+#include <fstream>
 #include <numeric>
 #include <algorithm>
 #include <random>
@@ -28,12 +29,13 @@ void PlaylistManager::addFiles() {
     // Allow multiple selection
     gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog), TRUE);
 
-    // Filter for Audio
+    // Filter for Audio & Playlists
     GtkFileFilter* filter = gtk_file_filter_new();
-    gtk_file_filter_set_name(filter, "Audio Files");
+    gtk_file_filter_set_name(filter, "Audio Files & Playlists");
     gtk_file_filter_add_pattern(filter, "*.mp3");
     gtk_file_filter_add_pattern(filter, "*.wav");
     gtk_file_filter_add_pattern(filter, "*.ogg");
+    gtk_file_filter_add_pattern(filter, "*.m3u"); // Fix: Added m3u support
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter);
 
     if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
@@ -43,23 +45,51 @@ void PlaylistManager::addFiles() {
         size_t oldSize = app->playlist.size();
         
         for (iter = filenames; iter; iter = iter->next) {
-            char *filename = (char *)iter->data;
-            app->playlist.push_back(std::string(filename));
-            g_free(filename);
+            char *cpath = (char *)iter->data;
+            std::string path(cpath);
+            
+            // Check extension for M3U
+            bool isM3u = false;
+            if (path.length() > 4) {
+                std::string ext = path.substr(path.length() - 4);
+                // Simple tolower check (or just check common case)
+                if (ext == ".m3u" || ext == ".M3U") isM3u = true;
+            }
+
+            if (isM3u) {
+                // Parse M3U
+                std::ifstream file(path);
+                std::string line;
+                while (std::getline(file, line)) {
+                    // Trim whitespace (basic)
+                    line.erase(0, line.find_first_not_of(" \t\r\n"));
+                    line.erase(line.find_last_not_of(" \t\r\n") + 1);
+                    
+                    if (line.empty()) continue;
+                    if (line[0] == '#') continue; // Skip comments
+                    
+                    // If relative path, logic needed? 
+                    // For now assume absolute or handle basics.
+                    // Usually M3Us in same folder are relative.
+                    // We will just push it for now.
+                    app->playlist.push_back(line);
+                }
+            } else {
+                // Normal Audio File
+                app->playlist.push_back(path);
+            }
+            
+            g_free(cpath);
         }
         g_slist_free(filenames);
         
         // Update Play Order
         size_t newSize = app->playlist.size();
         app->play_order.resize(newSize);
-        // Fill new slots with sequential indices
         for(size_t i = oldSize; i < newSize; i++) {
             app->play_order[i] = i;
         }
         
-        // If shuffle is on, we should technically re-shuffle, 
-        // but appending is safer for currently playing tracks.
-
         refreshUI();
     }
 
@@ -67,22 +97,18 @@ void PlaylistManager::addFiles() {
 }
 
 void PlaylistManager::clear() {
-    // Stop playback
     player->stop();
     
-    // Clear Data
     app->playlist.clear();
     app->play_order.clear();
     app->current_track_idx = -1;
     app->playing = false;
     app->paused = false;
     
-    // Refresh UI (Empty List)
     refreshUI();
 }
 
 void PlaylistManager::refreshUI() {
-    // Clear existing widgets in the listbox
     GList *children, *iter;
     children = gtk_container_get_children(GTK_CONTAINER(listBox));
     for (iter = children; iter != NULL; iter = g_list_next(iter)) {
@@ -90,10 +116,7 @@ void PlaylistManager::refreshUI() {
     }
     g_list_free(children);
 
-    // Add new items
     for (size_t i = 0; i < app->playlist.size(); i++) {
-        // We display items in their storage order (0, 1, 2...)
-        // even if shuffle plays them in random order (5, 2, 9...)
         std::string path = app->playlist[i];
         
         size_t lastSlash = path.find_last_of("/");
@@ -104,13 +127,6 @@ void PlaylistManager::refreshUI() {
         GtkWidget* label = gtk_label_new(labelStr.c_str());
         gtk_label_set_xalign(GTK_LABEL(label), 0.0);
         
-        // Highlight if currently playing
-        if (app->current_track_idx != -1 && 
-            (int)app->play_order[app->current_track_idx] == (int)i) {
-            // In GTK, we rely on row selection, but we can color text too
-            // This requires CSS or Markup, keeping it simple for now.
-        }
-        
         gtk_container_add(GTK_CONTAINER(listBox), label);
         gtk_widget_show(label);
     }
@@ -120,16 +136,9 @@ void PlaylistManager::onRowActivated(GtkListBox* box, GtkListBoxRow* row) {
     int visual_index = gtk_list_box_row_get_index(row);
     if (visual_index >= 0 && visual_index < (int)app->playlist.size()) {
         
-        // Find where this visual index lives in the play_order
-        // If shuffle is OFF: play_order[i] == i.
-        // If shuffle is ON: we need to find 'visual_index' in 'play_order'.
-        
         if (!app->shuffle) {
             app->current_track_idx = visual_index;
         } else {
-            // In shuffle mode, clicking a song forces it to play,
-            // usually resetting the shuffle order or finding it.
-            // Simple approach: Find it.
             for(size_t i=0; i<app->play_order.size(); i++) {
                 if((int)app->play_order[i] == visual_index) {
                     app->current_track_idx = i;
@@ -171,13 +180,12 @@ void PlaylistManager::deleteSelected() {
      if(row) {
          int idx = gtk_list_box_row_get_index(row);
          app->playlist.erase(app->playlist.begin() + idx);
-         // Also need to remove from play_order and rebalance
-         // For simplicity in this snippet, we just rebuild play_order linear
+         
          app->play_order.clear();
          app->play_order.resize(app->playlist.size());
          std::iota(app->play_order.begin(), app->play_order.end(), 0);
          
-         app->current_track_idx = -1; // Stop playing to avoid crash
+         app->current_track_idx = -1; 
          player->stop();
          refreshUI();
      }
