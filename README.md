@@ -36,7 +36,7 @@ make
 ./build/bin/TermuxMusic95
 ```
 
-For detailed build instructions, see [BUILDING.md](BUILDING.md)
+For detailed build instructions, see [BUILDING.md](docs/BUILDING.md)
 
 ***
 
