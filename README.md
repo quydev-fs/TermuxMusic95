@@ -24,39 +24,19 @@
 - Playlist and folder support
 
 ***
+## 🚀 Quick Start
 
-## 🛠️ Prerequisites
-
-Make sure you have these components installed in your Termux environment:
-- Termux:
 ```sh
-pkg install clang make x11-repo
-pkg install termux-x11-nightly pkg-config gtk3 gstreamer gstreamer-plugins
-```
-- Debian-based distros:
-```sh
-sudo apt update
-sudo apt install build-essential clang pkg-config libstdc++-dev libgtk-3-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
-```
-- Arch-based distros
-```sh
-# 1. Install development tools
-sudo pacman -S base-devel
+# Clone and build
+git clone https://github.com/quydev-fs/TermuxMusic95.git
+cd TermuxMusic95
+make
 
-# 2. Install GTK3 and GStreamer libraries
-sudo pacman -S gtk3 gstreamer gst-plugins-base
-
+# Run
+./build/bin/TermuxMusic95
 ```
 
-1. **X Server (For Termux):**
-   Launch an X server with:
-   ```sh
-   termux-x11 :0 &
-   ```
-2. **Set the DISPLAY variable:**
-   ```sh
-   export DISPLAY=:0
-   ```
+For detailed build instructions, see [BUILDING.md](BUILDING.md)
 
 ***
 
@@ -68,21 +48,6 @@ sudo pacman -S gtk3 gstreamer gst-plugins-base
 | build/        | Compiled build artifacts (executables, binaries)    |
 | Makefile      | Build script usingg++, links all required libraries |
 | main.cpp      | Entry point, parses arguments and playlist          |
-
-***
-
-## 🏗️ Build Instructions
-
-1. **Clone the repository and change into its directory:**
-   ```sh
-   git clone https://github.com/quydev-fs/TermuxMusic95.git
-   cd TermuxMusic95
-   ```
-2. **Build the project:**
-   ```sh
-   make
-   ```
-   This will generate the `TermuxMusic95` executable.
 
 ***
 
