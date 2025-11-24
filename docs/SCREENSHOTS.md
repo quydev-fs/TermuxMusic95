@@ -5,7 +5,7 @@ this file contain screenshots of the TermAMP music player.
 <p align="center">TermAMP full mode (idle)</p>
 
 <p align="center">
-  <img src="assets/screenshots/termamp-full-idle.png" alt="Full mode idle"/>
+  <img src="../assets/screenshots/termamp-full-idle.png" alt="Full mode idle"/>
 </p>
 
 ***
@@ -13,7 +13,7 @@ this file contain screenshots of the TermAMP music player.
 <p align="center">TermAMP full mode (playing)</p>
 
 <p align="center">
-  <img src="assets/screenshots/termamp-full-playing.png" alt="Full mode playing"/>
+  <img src="../assets/screenshots/termamp-full-playing.png" alt="Full mode playing"/>
 </p>
 
 ***
@@ -21,7 +21,7 @@ this file contain screenshots of the TermAMP music player.
 <p align="center">TermAMP mini mode (idle)</p>
 
 <p align="center">
-  <img src="assets/screenshots/termamp-mini-idle.png" alt="Mini mode idle"/>
+  <img src="../assets/screenshots/termamp-mini-idle.png" alt="Mini mode idle"/>
 </p>
 
 ***
@@ -29,5 +29,5 @@ this file contain screenshots of the TermAMP music player.
 <p align="center">TermAMP mini mode (playing)</p>
 
 <p align="center">
-  <img src="assets/screenshots/termamp-mini-playing.png" alt="Mini mode playing"/>
+  <img src="../assets/screenshots/termamp-mini-playing.png" alt="Mini mode playing"/>
 </p>
