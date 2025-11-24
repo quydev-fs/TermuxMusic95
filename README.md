@@ -1,7 +1,7 @@
 # TermAMP
 
 <p align="center">
-  <img src="assets/icons/logo.jpg" />
+  <img src="assets/icons/logo.jpg" alt="logo"/>
 </p>
 
 *An GTK-based MP3 player for Termux, inspired by WinAMP 2.x and written entirely in C++.*
@@ -42,13 +42,40 @@ For detailed build instructions, see [BUILDING.md](docs/BUILDING.md)
 ***
 
 ## 📂 Project Structure
-| Folder / File | Description                                         |
-| ------------- | --------------------------------------------------- |
-| src/          | C++ source code files                               |
-| include/      | C++ header files                                    |
-| build/        | Compiled build artifacts (executables, binaries)    |
-| Makefile      | Build script usingg++, links all required libraries |
-| src/main.cpp      | Entry point, parses arguments and playlist          |
+```
+TermAMP/
+├── src/                 # C++ source files
+│   ├── main.cpp        # Application entry point
+│   ├── player.cpp      # Audio playback engine
+│   ├── playlist.cpp    # Playlist management
+│   ├── ui.cpp          # Terminal user interface
+│   └── visualizer.cpp  # Audio visualization
+├── include/            # Header files
+│   ├── common.h        # Common definitions & utilities
+│   ├── player.h
+│   ├── playlist.h
+│   ├── ui.h
+│   └── visualizer.h
+├── build/              # Build artifacts (generated)
+│   ├── obj/           # Object files
+│   └── bin/           # Executable output
+├── assets/             # Application resources
+│   ├── icons/
+│   │   └── logo.png   # Application and readme logo
+│   ├── style.css
+│   └── screenshots/   # Application screenshots
+│       ├── termamp-full-idle.png
+│       ├── termamp-full-playing.png
+│       ├── termamp-mini-idle.png
+│       └── termamp-mini-playing.png
+├── Makefile           # Build configuration
+└── README.md          # Project documentation
+```
+***
+
+## 📸 Screenshots
+
+for screenshots, go to [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)
 
 ***
 

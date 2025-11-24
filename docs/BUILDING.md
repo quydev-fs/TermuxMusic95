@@ -215,8 +215,13 @@ TermAMP/
 │   └── bin/           # Executable output
 ├── assets/             # Application resources
 │   ├── icons/
-│   │   └── logo.jpg   # Application logo
-│   └── style.css      # UI styling
+│   │   └── logo.png   # Application and readme logo
+│   ├── style.css
+│   └── screenshots/   # Application screenshots
+│       ├── termamp-full-idle.png
+│       ├── termamp-full-playing.png
+│       ├── termamp-mini-idle.png
+│       └── termamp-mini-playing.png
 ├── Makefile           # Build configuration
 └── README.md          # Project documentation
 ```
