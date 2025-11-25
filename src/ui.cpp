@@ -4,47 +4,28 @@
 #include <unistd.h>
 #include <iomanip>
 #include <sstream>
-#include <cstdlib> // For getenv
+#include <cstdlib> 
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-// --- CONSTANTS ---
 const int FULL_WIDTH = 320;
 const int FULL_HEIGHT_INIT = 340; 
 const int VISUALIZER_FULL_HEIGHT = 40; 
 const int MINI_HEIGHT_REPURPOSED = 180; 
 
-// --- HELPER FUNCTION ---
 std::string getResourcePath(const std::string& assetName) {
-    // Check standard Termux prefix environment variable
-    std::string configDir;
-    const char* env_prefix = std::getenv("PREFIX");
-    if (env_prefix) {
-        configDir = std::string(env_prefix) + "/etc/TermAMP/";
-    } else {
-        // Relative Fallback for dev environment
-        char result[PATH_MAX];
-        for(int i=0; i<PATH_MAX; ++i) result[i] = 0;
-        ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
-        if (count != -1) {
-            std::string exePath(result, count);
-            std::string binDir = exePath.substr(0, exePath.find_last_of("/"));
-            return binDir + "/../../" + assetName;
-        }
-        return assetName;
+    char result[PATH_MAX];
+    for(int i=0; i<PATH_MAX; ++i) result[i] = 0;
+    ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
+    if (count != -1) {
+        std::string exePath(result, count);
+        std::string binDir = exePath.substr(0, exePath.find_last_of("/"));
+        return binDir + "/../../" + assetName;
     }
-
-    // Strip "assets/" prefix if using system install
-    std::string cleanName = assetName;
-    std::string removePrefix = "assets/";
-    if (cleanName.rfind(removePrefix, 0) == 0) {
-        cleanName = cleanName.substr(removePrefix.length());
-    }
-    return configDir + cleanName;
+    return assetName;
 }
 
-// --- CONSTRUCTOR ---
 UI::UI(int argc, char** argv) {
     gtk_init(&argc, &argv);
     player = nullptr;
@@ -54,7 +35,6 @@ UI::UI(int argc, char** argv) {
     drawingArea = nullptr;
 }
 
-// --- DESTRUCTOR ---
 UI::~UI() {
     if (playlistBox) g_object_unref(playlistBox);
     if (drawingArea) g_object_unref(drawingArea);
@@ -63,7 +43,6 @@ UI::~UI() {
     if (player) delete player;
 }
 
-// --- LOADING LOGIC ---
 void UI::loadLogo() {
     std::string logoPath = getResourcePath("assets/icons/logo.jpg");
     GError *err = NULL;
@@ -77,99 +56,80 @@ void UI::initCSS() {
     std::string cssPath = getResourcePath("assets/style.css");
     GError *error = NULL;
     gtk_css_provider_load_from_path(provider, cssPath.c_str(), &error);
-    if (error) {
-        std::cerr << "CSS Load Error: " << error->message << std::endl;
-        g_error_free(error);
-    } else {
+    if (!error) {
         gtk_style_context_add_provider_for_screen(gdk_screen_get_default(), GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    } else {
+        g_error_free(error);
     }
     g_object_unref(provider);
 }
 
-// --- MINI MODE LOGIC ---
 void UI::toggleMiniMode(bool force_resize) {
     is_mini_mode = !is_mini_mode;
-
     GtkWidget* scrolled = gtk_widget_get_parent(playlistBox);
     if (!scrolled) scrolled = gtk_widget_get_parent(drawingArea);
 
     if (is_mini_mode) {
         g_object_ref(drawingArea);
         g_object_ref(playlistBox);
-
         gtk_container_remove(GTK_CONTAINER(visualizerContainerBox), drawingArea);
         gtk_widget_hide(visualizerContainerBox); 
-
         gtk_container_remove(GTK_CONTAINER(scrolled), playlistBox);
-        
         gtk_container_add(GTK_CONTAINER(scrolled), drawingArea);
         gtk_widget_set_size_request(drawingArea, FULL_WIDTH, 120); 
         gtk_widget_show(drawingArea);
-
         gtk_window_set_default_size(GTK_WINDOW(window), FULL_WIDTH, MINI_HEIGHT_REPURPOSED);
         gtk_window_resize(GTK_WINDOW(window), FULL_WIDTH, MINI_HEIGHT_REPURPOSED);
-        
-        gtk_button_set_label(GTK_BUTTON(btnMiniMode), "F");
-        
+        gtk_button_set_label(GTK_BUTTON(btnMiniMode), "FUL");
         g_object_unref(drawingArea);
         g_object_unref(playlistBox);
     } else {
         g_object_ref(drawingArea);
         g_object_ref(playlistBox);
-
         gtk_container_remove(GTK_CONTAINER(scrolled), drawingArea);
         gtk_container_add(GTK_CONTAINER(scrolled), playlistBox);
         gtk_widget_show(playlistBox);
-        
         gtk_box_pack_start(GTK_BOX(visualizerContainerBox), drawingArea, FALSE, FALSE, 0);
         gtk_box_reorder_child(GTK_BOX(visualizerContainerBox), drawingArea, 0);
-        
         gtk_widget_set_size_request(drawingArea, -1, VISUALIZER_FULL_HEIGHT);
         gtk_widget_show(visualizerContainerBox);
         gtk_widget_show(drawingArea);
-
         gtk_window_set_default_size(GTK_WINDOW(window), FULL_WIDTH, FULL_HEIGHT_INIT);
         gtk_window_resize(GTK_WINDOW(window), FULL_WIDTH, FULL_HEIGHT_INIT);
-        
-        gtk_button_set_label(GTK_BUTTON(btnMiniMode), "M");
-
+        gtk_button_set_label(GTK_BUTTON(btnMiniMode), "MINI");
         g_object_unref(drawingArea);
         g_object_unref(playlistBox);
     }
 }
 
-void UI::onMiniModeClicked(GtkButton* btn, gpointer data) {
-    ((UI*)data)->toggleMiniMode();
-}
+void UI::onMiniModeClicked(GtkButton* btn, gpointer data) { ((UI*)data)->toggleMiniMode(); }
 
-// --- CRITICAL FIX: PLAY BUTTON LOGIC ---
+// --- FIXED PLAY BUTTON LOGIC ---
 void UI::onPlayClicked(GtkButton* b, gpointer d) { 
     UI* ui = (UI*)d;
     if (ui->appState.playlist.empty()) return;
 
-    // Get the Authoritative GStreamer State
-    GstState state = ui->player->getState();
-
-    // CASE 1: RESUME
-    // If PAUSED, just set to PLAYING. Do NOT load URI.
-    if (state == GST_STATE_PAUSED) {
+    // 1. Priority Check: Internal Pause Flag
+    // If we flagged it as paused, we MUST resume, regardless of what GStreamer thinks.
+    if (ui->appState.paused) {
+        std::cerr << "[UI] Resuming from Paused State" << std::endl;
         ui->player->play();
         return;
     }
 
-    // CASE 2: ALREADY PLAYING
-    // Do nothing.
-    if (state == GST_STATE_PLAYING) {
+    // 2. If already playing, ignore
+    if (ui->appState.playing) {
         return;
     }
 
-    // CASE 3: STOPPED/NULL (Start new playback)
+    // 3. Cold Start (Stopped/Initial)
+    std::cerr << "[UI] Starting New/Load" << std::endl;
     if (ui->appState.current_track_idx == -1) {
         ui->appState.current_track_idx = 0;
         size_t idx = (!ui->appState.play_order.empty()) ? ui->appState.play_order[0] : 0;
         ui->player->load(ui->appState.playlist[idx]);
     } else {
-        // Reload current track from scratch
+        // Ensure current track is reloaded properly if stopped
         size_t idx = ui->appState.play_order[ui->appState.current_track_idx];
         ui->player->load(ui->appState.playlist[idx]);
     }
@@ -225,7 +185,6 @@ void UI::onSeekChanged(GtkRange* range, gpointer data) {
 
 gboolean UI::onUpdateTick(gpointer data) {
     UI* ui = (UI*)data;
-    
     if (!ui->player) return TRUE;
 
     if (ui->appState.playing) {
@@ -318,16 +277,16 @@ void UI::buildWidgets() {
     g_signal_connect(volScale, "value-changed", G_CALLBACK(onVolumeChanged), this);
 
     GtkWidget* controlsBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-    GtkWidget* btnPrev = gtk_button_new_with_label("|<");
-    GtkWidget* btnPlay = gtk_button_new_with_label("|>");
-    GtkWidget* btnPause = gtk_button_new_with_label("||");
-    GtkWidget* btnStop = gtk_button_new_with_label("[]");
-    GtkWidget* btnNext = gtk_button_new_with_label(">|");
-    GtkWidget* btnAdd = gtk_button_new_with_label("+");   
-    GtkWidget* btnClear = gtk_button_new_with_label("C"); 
-    btnShuffle = gtk_button_new_with_label("S");
-    btnRepeat = gtk_button_new_with_label("R");
-    btnMiniMode = gtk_button_new_with_label("M"); 
+    GtkWidget* btnPrev = gtk_button_new_with_label("PREVIOUS");
+    GtkWidget* btnPlay = gtk_button_new_with_label("PLAY");
+    GtkWidget* btnPause = gtk_button_new_with_label("PAUSE");
+    GtkWidget* btnStop = gtk_button_new_with_label("RESET");
+    GtkWidget* btnNext = gtk_button_new_with_label("NEXT");
+    GtkWidget* btnAdd = gtk_button_new_with_label("ADD");   
+    GtkWidget* btnClear = gtk_button_new_with_label("CLS"); 
+    btnShuffle = gtk_button_new_with_label("SHUFFLE");
+    btnRepeat = gtk_button_new_with_label("REPAT");
+    btnMiniMode = gtk_button_new_with_label("MINI"); 
 
     gtk_box_pack_start(GTK_BOX(controlsBox), btnPrev, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(controlsBox), btnPlay, TRUE, TRUE, 0);
@@ -360,7 +319,6 @@ void UI::buildWidgets() {
     g_signal_connect(btnShuffle, "clicked", G_CALLBACK(onShuffleClicked), this);
     g_signal_connect(btnRepeat, "clicked", G_CALLBACK(onRepeatClicked), this);
     g_signal_connect(btnMiniMode, "clicked", G_CALLBACK(onMiniModeClicked), this);
-    
     g_signal_connect(drawingArea, "draw", G_CALLBACK(Visualizer::onDraw), visualizer);
     
     loadLogo();

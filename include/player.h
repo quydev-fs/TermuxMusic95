@@ -17,7 +17,6 @@ public:
     void pause();
     void stop();
     
-    // CRITICAL: Expose the true GStreamer state to the UI
     GstState getState();
     
     void setVolume(double volume);
@@ -37,7 +36,7 @@ private:
     
     void handleTags(GstTagList* tags);
     
-    // FIX: Timestamp to ignore spurious EOS signals on resume (Termux specific issue)
+    // Fix: Guard against spurious EOS signals on resume
     guint64 last_play_time = 0; 
 };
 
