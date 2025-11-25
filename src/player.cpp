@@ -28,8 +28,20 @@ void Player::setEOSCallback(EOSCallback cb, void* data) {
     eosData = data;
 }
 
+// --- CRITICAL FIX: State Query Implementation ---
+GstState Player::getState() {
+    GstState state = GST_STATE_NULL;
+    if (pipeline) {
+        // Timeout 0 means immediate return (cached state)
+        // Timeout 100ns ensures we get a reasonably fresh state
+        gst_element_get_state(pipeline, &state, NULL, 100);
+    }
+    return state;
+}
+
 void Player::load(const std::string& path) {
     stop(); 
+    // Extract filename for immediate display
     std::string filename = std::filesystem::path(path).filename().string();
     app->current_track_name = filename; 
     
@@ -37,8 +49,11 @@ void Player::load(const std::string& path) {
     gchar *uri = gst_filename_to_uri(path.c_str(), &error);
     
     if (error) {
+        // Fallback if already a URI
         if (path.find("file://") == 0 || path.find("http://") == 0) {
              g_object_set(G_OBJECT(pipeline), "uri", path.c_str(), NULL);
+        } else {
+             std::cerr << "URI Error: " << error->message << std::endl;
         }
         g_error_free(error);
     } else {
@@ -50,7 +65,7 @@ void Player::load(const std::string& path) {
 void Player::play() {
     if (!pipeline) return;
     
-    // FIX: Record time BEFORE changing state
+    // CRITICAL: Record time BEFORE changing state to guard against instant EOS
     last_play_time = g_get_monotonic_time();
     
     gst_element_set_state(pipeline, GST_STATE_PLAYING);
@@ -123,12 +138,15 @@ gboolean Player::busCallback(GstBus* bus, GstMessage* msg, gpointer data) {
     Player* player = (Player*)data;
     switch (GST_MESSAGE_TYPE(msg)) {
         case GST_MESSAGE_EOS: {
-            // FIX: Check timestamp. If < 500ms since resume, it's a glitch.
+            // CRITICAL FIX: EOS Guard
+            // If EOS happens < 500ms after we called play(), it's a flush/glitch.
             guint64 now = g_get_monotonic_time();
             if (now < player->last_play_time + 500000) {
-                break; // Ignore this EOS
+                // Ignore this EOS
+                break;
             }
 
+            // Valid EOS: Signal the playlist manager
             if (player->app->playing) {
                 if (player->onEOS) player->onEOS(player->eosData);
                 else player->stop();
