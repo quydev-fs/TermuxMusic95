@@ -277,16 +277,16 @@ void UI::buildWidgets() {
     g_signal_connect(volScale, "value-changed", G_CALLBACK(onVolumeChanged), this);
 
     GtkWidget* controlsBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-    GtkWidget* btnPrev = gtk_button_new_with_label("PREVIOUS");
-    GtkWidget* btnPlay = gtk_button_new_with_label("PLAY");
-    GtkWidget* btnPause = gtk_button_new_with_label("PAUSE");
-    GtkWidget* btnStop = gtk_button_new_with_label("RESET");
-    GtkWidget* btnNext = gtk_button_new_with_label("NEXT");
-    GtkWidget* btnAdd = gtk_button_new_with_label("ADD");   
+    GtkWidget* btnPrev = gtk_button_new_with_label("<");
+    GtkWidget* btnPlay = gtk_button_new_with_label("|>");
+    GtkWidget* btnPause = gtk_button_new_with_label("||");
+    GtkWidget* btnStop = gtk_button_new_with_label("[]");
+    GtkWidget* btnNext = gtk_button_new_with_label(">");
+    GtkWidget* btnAdd = gtk_button_new_with_label("+");   
     GtkWidget* btnClear = gtk_button_new_with_label("CLS"); 
-    btnShuffle = gtk_button_new_with_label("SHUFFLE");
-    btnRepeat = gtk_button_new_with_label("REPAT");
-    btnMiniMode = gtk_button_new_with_label("MINI"); 
+    btnShuffle = gtk_button_new_with_label("SH");
+    btnRepeat = gtk_button_new_with_label("R");
+    btnMiniMode = gtk_button_new_with_label("M"); 
 
     gtk_box_pack_start(GTK_BOX(controlsBox), btnPrev, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(controlsBox), btnPlay, TRUE, TRUE, 0);
