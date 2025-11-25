@@ -41,7 +41,6 @@ directories:
 	@mkdir -p $(OBJ_DIR)
 	@mkdir -p $(BIN_DIR)
 
-# --- INSTALL TARGET UPDATED FOR /etc/TermAMP ---
 install: all
 	@echo "[INSTALL] Installing binary..."
 	mkdir -p $(DESTDIR)$(PREFIX)/bin

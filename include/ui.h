@@ -5,18 +5,22 @@
 #include "player.h"
 #include "playlist.h"
 #include "visualizer.h"
+// Include the new Utils
+#include "utils.h"
 
 class UI {
 public:
     UI(int argc, char** argv);
-    ~UI(); // <--- FIX: Added Destructor Declaration
+    ~UI();
     int run();
 
 private:
-    void initCSS();
+    // Refactored: initCSS and loadLogo removed (moved to Utils)
     void buildWidgets();
-    void loadLogo();
     
+    // --- Menu Callbacks ---
+    static void onAboutClicked(GtkMenuItem* item, gpointer data);
+
     // --- Mode Control ---
     void toggleMiniMode(bool force_resize = false); 
     static void onMiniModeClicked(GtkButton* btn, gpointer data);
@@ -59,7 +63,6 @@ private:
     
     GtkWidget* visualizerContainerBox;
 
-    // State
     bool isSeeking = false;
     bool is_mini_mode = false;
 };

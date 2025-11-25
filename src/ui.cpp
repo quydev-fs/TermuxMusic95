@@ -1,30 +1,13 @@
 #include "ui.h"
 #include <iostream>
-#include <limits.h>
-#include <unistd.h>
 #include <iomanip>
 #include <sstream>
-#include <cstdlib> 
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-
+// --- CONSTANTS ---
 const int FULL_WIDTH = 320;
-const int FULL_HEIGHT_INIT = 340; 
+const int FULL_HEIGHT_INIT = 360; // Increased slightly for Menu Bar
 const int VISUALIZER_FULL_HEIGHT = 40; 
 const int MINI_HEIGHT_REPURPOSED = 180; 
-
-std::string getResourcePath(const std::string& assetName) {
-    char result[PATH_MAX];
-    for(int i=0; i<PATH_MAX; ++i) result[i] = 0;
-    ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
-    if (count != -1) {
-        std::string exePath(result, count);
-        std::string binDir = exePath.substr(0, exePath.find_last_of("/"));
-        return binDir + "/../../" + assetName;
-    }
-    return assetName;
-}
 
 UI::UI(int argc, char** argv) {
     gtk_init(&argc, &argv);
@@ -33,6 +16,9 @@ UI::UI(int argc, char** argv) {
     visualizer = nullptr;
     playlistBox = nullptr;
     drawingArea = nullptr;
+    
+    // REFACTOR: Load resources via Utils
+    Utils::loadGlobalCSS();
 }
 
 UI::~UI() {
@@ -43,60 +29,97 @@ UI::~UI() {
     if (player) delete player;
 }
 
-void UI::loadLogo() {
-    std::string logoPath = getResourcePath("assets/icons/logo.jpg");
-    GError *err = NULL;
-    if(!gtk_window_set_icon_from_file(GTK_WINDOW(window), logoPath.c_str(), &err)) {
-        if(err) g_error_free(err);
-    }
+// --- NEW: ABOUT DIALOG ---
+void UI::onAboutClicked(GtkMenuItem* item, gpointer data) {
+    UI* ui = (UI*)data;
+    
+    // Create a custom dialog
+    GtkWidget* dialog = gtk_dialog_new_with_buttons(
+        "About TermAMP",
+        GTK_WINDOW(ui->window),
+        (GtkDialogFlags)(GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT),
+        "Close", GTK_RESPONSE_OK,
+        NULL
+    );
+    
+    // Get content area
+    GtkWidget* content_area = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+    gtk_container_set_border_width(GTK_CONTAINER(content_area), 15);
+    
+    // Vertical Box for layout
+    GtkWidget* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+    gtk_container_add(GTK_CONTAINER(content_area), box);
+    
+    // 1. Centered Logo (Size 64x64)
+    GtkWidget* img = Utils::createLogoImage(64);
+    gtk_widget_set_halign(img, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(box), img, FALSE, FALSE, 0);
+    
+    // 2. Project Name
+    GtkWidget* lblName = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(lblName), "<span size='x-large' weight='bold' color='#00E200'>TermAMP</span>");
+    gtk_box_pack_start(GTK_BOX(box), lblName, FALSE, FALSE, 0);
+    
+    // 3. Credits
+    GtkWidget* lblCredit = gtk_label_new("(c) quydev-fs 2025\nLicensed under MIT");
+    gtk_label_set_justify(GTK_LABEL(lblCredit), GTK_JUSTIFY_CENTER);
+    // Use standard white/grey for credits to differentiate
+    GtkStyleContext *context = gtk_widget_get_style_context(lblCredit);
+    gtk_style_context_add_class(context, "dim-label"); // You can add this class to CSS if you want specific color
+    gtk_box_pack_start(GTK_BOX(box), lblCredit, FALSE, FALSE, 0);
+    
+    // 4. The Quote
+    GtkWidget* lblQuote = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(lblQuote), "<i>\"it may better when it come to retro\"</i>");
+    gtk_box_pack_start(GTK_BOX(box), lblQuote, FALSE, FALSE, 5);
+
+    gtk_widget_show_all(dialog);
+    gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
 }
 
-void UI::initCSS() {
-    GtkCssProvider *provider = gtk_css_provider_new();
-    std::string cssPath = getResourcePath("assets/style.css");
-    GError *error = NULL;
-    gtk_css_provider_load_from_path(provider, cssPath.c_str(), &error);
-    if (!error) {
-        gtk_style_context_add_provider_for_screen(gdk_screen_get_default(), GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-    } else {
-        g_error_free(error);
-    }
-    g_object_unref(provider);
-}
-
+// --- MINI MODE LOGIC ---
 void UI::toggleMiniMode(bool force_resize) {
     is_mini_mode = !is_mini_mode;
+
     GtkWidget* scrolled = gtk_widget_get_parent(playlistBox);
     if (!scrolled) scrolled = gtk_widget_get_parent(drawingArea);
 
     if (is_mini_mode) {
         g_object_ref(drawingArea);
         g_object_ref(playlistBox);
+
         gtk_container_remove(GTK_CONTAINER(visualizerContainerBox), drawingArea);
         gtk_widget_hide(visualizerContainerBox); 
+
         gtk_container_remove(GTK_CONTAINER(scrolled), playlistBox);
         gtk_container_add(GTK_CONTAINER(scrolled), drawingArea);
         gtk_widget_set_size_request(drawingArea, FULL_WIDTH, 120); 
         gtk_widget_show(drawingArea);
+
         gtk_window_set_default_size(GTK_WINDOW(window), FULL_WIDTH, MINI_HEIGHT_REPURPOSED);
         gtk_window_resize(GTK_WINDOW(window), FULL_WIDTH, MINI_HEIGHT_REPURPOSED);
-        gtk_button_set_label(GTK_BUTTON(btnMiniMode), "FUL");
+        gtk_button_set_label(GTK_BUTTON(btnMiniMode), "F");
         g_object_unref(drawingArea);
         g_object_unref(playlistBox);
     } else {
         g_object_ref(drawingArea);
         g_object_ref(playlistBox);
+
         gtk_container_remove(GTK_CONTAINER(scrolled), drawingArea);
         gtk_container_add(GTK_CONTAINER(scrolled), playlistBox);
         gtk_widget_show(playlistBox);
+        
         gtk_box_pack_start(GTK_BOX(visualizerContainerBox), drawingArea, FALSE, FALSE, 0);
         gtk_box_reorder_child(GTK_BOX(visualizerContainerBox), drawingArea, 0);
+        
         gtk_widget_set_size_request(drawingArea, -1, VISUALIZER_FULL_HEIGHT);
         gtk_widget_show(visualizerContainerBox);
         gtk_widget_show(drawingArea);
+
         gtk_window_set_default_size(GTK_WINDOW(window), FULL_WIDTH, FULL_HEIGHT_INIT);
         gtk_window_resize(GTK_WINDOW(window), FULL_WIDTH, FULL_HEIGHT_INIT);
-        gtk_button_set_label(GTK_BUTTON(btnMiniMode), "MIN");
+        gtk_button_set_label(GTK_BUTTON(btnMiniMode), "M");
         g_object_unref(drawingArea);
         g_object_unref(playlistBox);
     }
@@ -104,36 +127,26 @@ void UI::toggleMiniMode(bool force_resize) {
 
 void UI::onMiniModeClicked(GtkButton* btn, gpointer data) { ((UI*)data)->toggleMiniMode(); }
 
-// --- FIXED PLAY BUTTON LOGIC ---
+// --- BUTTON CALLBACKS ---
 void UI::onPlayClicked(GtkButton* b, gpointer d) { 
     UI* ui = (UI*)d;
     if (ui->appState.playlist.empty()) return;
-
-    // 1. Priority Check: Internal Pause Flag
-    // If we flagged it as paused, we MUST resume, regardless of what GStreamer thinks.
-    if (ui->appState.paused) {
-        std::cerr << "[UI] Resuming from Paused State" << std::endl;
+    
+    GstState state = ui->player->getState();
+    if (state == GST_STATE_PAUSED) {
         ui->player->play();
         return;
     }
+    if (state == GST_STATE_PLAYING) return;
 
-    // 2. If already playing, ignore
-    if (ui->appState.playing) {
-        return;
-    }
-
-    // 3. Cold Start (Stopped/Initial)
-    std::cerr << "[UI] Starting New/Load" << std::endl;
     if (ui->appState.current_track_idx == -1) {
         ui->appState.current_track_idx = 0;
         size_t idx = (!ui->appState.play_order.empty()) ? ui->appState.play_order[0] : 0;
         ui->player->load(ui->appState.playlist[idx]);
     } else {
-        // Ensure current track is reloaded properly if stopped
         size_t idx = ui->appState.play_order[ui->appState.current_track_idx];
         ui->player->load(ui->appState.playlist[idx]);
     }
-    
     ui->player->play(); 
 }
 
@@ -234,17 +247,42 @@ gboolean UI::onKeyPress(GtkWidget* widget, GdkEventKey* event, gpointer data) {
 
 void UI::buildWidgets() {
     window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_title(GTK_WINDOW(window), "TermAMP");
+    gtk_window_set_title(GTK_WINDOW(window), "TermuxMusic95");
     gtk_window_set_default_size(GTK_WINDOW(window), FULL_WIDTH, FULL_HEIGHT_INIT);
     gtk_window_set_resizable(GTK_WINDOW(window), FALSE); 
+    
+    // Set Window Icon using Utils
+    Utils::setWindowIcon(window);
+
     GtkStyleContext *context = gtk_widget_get_style_context(window);
     gtk_style_context_add_class(context, "tm-window");
+
     g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
     g_signal_connect(window, "key-press-event", G_CALLBACK(onKeyPress), this);
 
     GtkWidget* mainBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
     gtk_container_set_border_width(GTK_CONTAINER(mainBox), 5);
     gtk_container_add(GTK_CONTAINER(window), mainBox);
+
+    // --- NEW: MENU BAR ---
+    GtkWidget* menuBar = gtk_menu_bar_new();
+    
+    // Help Menu
+    GtkWidget* helpMenu = gtk_menu_new();
+    GtkWidget* helpItem = gtk_menu_item_new_with_label("Help");
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(helpItem), helpMenu);
+    
+    // About Item
+    GtkWidget* aboutItem = gtk_menu_item_new_with_label("About...");
+    gtk_menu_shell_append(GTK_MENU_SHELL(helpMenu), aboutItem);
+    g_signal_connect(aboutItem, "activate", G_CALLBACK(onAboutClicked), this);
+    
+    gtk_menu_shell_append(GTK_MENU_SHELL(menuBar), helpItem);
+    
+    // Pack Menu Bar at the TOP
+    gtk_box_pack_start(GTK_BOX(mainBox), menuBar, FALSE, FALSE, 0);
+
+    // --- END MENU BAR ---
 
     visualizerContainerBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_box_pack_start(GTK_BOX(mainBox), visualizerContainerBox, FALSE, FALSE, 0);
@@ -283,8 +321,8 @@ void UI::buildWidgets() {
     GtkWidget* btnStop = gtk_button_new_with_label("[]");
     GtkWidget* btnNext = gtk_button_new_with_label(">");
     GtkWidget* btnAdd = gtk_button_new_with_label("+");   
-    GtkWidget* btnClear = gtk_button_new_with_label("CLS"); 
-    btnShuffle = gtk_button_new_with_label("SH");
+    GtkWidget* btnClear = gtk_button_new_with_label("C"); 
+    btnShuffle = gtk_button_new_with_label("S");
     btnRepeat = gtk_button_new_with_label("R");
     btnMiniMode = gtk_button_new_with_label("M"); 
 
@@ -320,12 +358,9 @@ void UI::buildWidgets() {
     g_signal_connect(btnRepeat, "clicked", G_CALLBACK(onRepeatClicked), this);
     g_signal_connect(btnMiniMode, "clicked", G_CALLBACK(onMiniModeClicked), this);
     g_signal_connect(drawingArea, "draw", G_CALLBACK(Visualizer::onDraw), visualizer);
-    
-    loadLogo();
 }
 
 int UI::run() {
-    initCSS();
     player = new Player(&appState);
     visualizer = new Visualizer(&appState); 
     buildWidgets(); 
