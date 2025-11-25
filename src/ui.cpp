@@ -275,7 +275,7 @@ gboolean UI::onKeyPress(GtkWidget* widget, GdkEventKey* event, gpointer data) {
 
 void UI::buildWidgets() {
     window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_title(GTK_WINDOW(window), "TermuxMusic95");
+    gtk_window_set_title(GTK_WINDOW(window), "TermAMP");
     gtk_window_set_default_size(GTK_WINDOW(window), FULL_WIDTH, FULL_HEIGHT_INIT);
     gtk_window_set_resizable(GTK_WINDOW(window), FALSE); 
     GtkStyleContext *context = gtk_widget_get_style_context(window);
