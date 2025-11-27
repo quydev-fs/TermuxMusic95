@@ -1,8 +1,8 @@
 /* assets/style.css */
 
-.tm-window { 
-    background-color: #282828; 
-    font-size: 12px; 
+.tm-window {
+    background-color: #282828;
+    font-size: 10px; /* Reduced from 12px */
 }
 
 .tm-window label { 
@@ -12,16 +12,16 @@
 }
 
 /* Button Styling with 3D Bevel Effect */
-.tm-window button { 
-    background-image: none; 
-    background-color: #454545; 
-    color: #cccccc; 
-    border: 2px solid; 
+.tm-window button {
+    background-image: none;
+    background-color: #454545;
+    color: #cccccc;
+    border: 2px solid;
     border-color: #606060 #202020 #202020 #606060; /* Raised 3D Bevel */
-    padding: 1px 5px; 
-    min-height: 20px; 
-    margin: 1px; 
-    border-radius: 0px; 
+    padding: 1px 5px;
+    min-height: 18px; /* Reduced from 20px */
+    margin: 1px;
+    border-radius: 0px;
 }
 
 /* Click Effect (Inset) */
@@ -38,10 +38,10 @@
     background-color: #383838; 
 }
 
-.tm-window list { 
-    background-color: #000000; 
-    color: #00E200; 
-    font-size: 11px; 
+.tm-window list {
+    background-color: #000000;
+    color: #00E200;
+    font-size: 9px; /* Reduced from 11px */
 }
 
 .tm-window list row:selected { 

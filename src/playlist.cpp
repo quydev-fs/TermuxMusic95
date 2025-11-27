@@ -179,11 +179,6 @@ void PlaylistManager::onRowActivated(GtkListBox* box, GtkListBoxRow* row) {
     size_t real_file_index = app->play_order[app->current_track_idx];
     player->load(app->playlist[real_file_index]);
     player->play();
-
-    // Trigger album art update callback if available
-    if (app->onAlbumArtChanged) {
-        app->onAlbumArtChanged(app->albumArtCallbackUserData);
-    }
 }
 
 // --- AUTO ADVANCE ---
@@ -248,10 +243,6 @@ void PlaylistManager::playNext() {
     }
     highlightCurrentTrack();
 
-    // Trigger album art update callback if available
-    if (app->onAlbumArtChanged) {
-        app->onAlbumArtChanged(app->albumArtCallbackUserData);
-    }
 }
 
 void PlaylistManager::playPrev() {
@@ -280,10 +271,6 @@ void PlaylistManager::playPrev() {
     }
     highlightCurrentTrack();
 
-    // Trigger album art update callback if available
-    if (app->onAlbumArtChanged) {
-        app->onAlbumArtChanged(app->albumArtCallbackUserData);
-    }
 }
 
 // --- FIXED: STATE TOGGLES (CRASH FIX) ---

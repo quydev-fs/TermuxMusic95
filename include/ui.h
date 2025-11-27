@@ -2,6 +2,7 @@
 #define UI_H
 
 #include "common.h"
+#include "config.h"
 #include "player.h"
 #include "playlist.h"
 #include "visualizer.h"
@@ -96,8 +97,6 @@ private:
     GtkWidget* convertFormatCombo;
     GtkWidget* convertProgress;
 
-    // Album art widgets
-    GtkWidget* albumArtImage;
 
     bool isSeeking = false;
     bool is_mini_mode = false;

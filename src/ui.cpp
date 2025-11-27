@@ -1,14 +1,14 @@
 #include "ui.h"
+#include "config.h"
 #include <iostream>
 #include <iomanip>
 #include <sstream>
 #include <thread>
-      
-// --- CONSTANTS ---      
-const int FULL_WIDTH = 320;      
-const int FULL_HEIGHT_INIT = 360;       
-const int VISUALIZER_FULL_HEIGHT = 40;       
-const int MINI_HEIGHT_REPURPOSED = 180;       
+
+// --- CONSTANTS ---
+const int FULL_WIDTH = UI_WINDOW_WIDTH;
+const int FULL_HEIGHT_INIT = UI_WINDOW_HEIGHT_INIT;
+const int MINI_HEIGHT_REPURPOSED = UI_MINI_MODE_HEIGHT;
       
 UI::UI(int argc, char** argv) {      
     gtk_init(&argc, &argv);      
@@ -87,7 +87,7 @@ void UI::toggleMiniMode(bool force_resize) {
       
         gtk_container_remove(GTK_CONTAINER(scrolled), playlistBox);      
         gtk_container_add(GTK_CONTAINER(scrolled), drawingArea);      
-        gtk_widget_set_size_request(drawingArea, FULL_WIDTH, 120);       
+        gtk_widget_set_size_request(drawingArea, UI_WINDOW_WIDTH, 120);       
         gtk_widget_show(drawingArea);      
       
         gtk_window_set_default_size(GTK_WINDOW(window), FULL_WIDTH, MINI_HEIGHT_REPURPOSED);      
@@ -106,7 +106,7 @@ void UI::toggleMiniMode(bool force_resize) {
         gtk_box_pack_start(GTK_BOX(visualizerContainerBox), drawingArea, FALSE, FALSE, 0);      
         gtk_box_reorder_child(GTK_BOX(visualizerContainerBox), drawingArea, 0);      
               
-        gtk_widget_set_size_request(drawingArea, -1, VISUALIZER_FULL_HEIGHT);      
+        gtk_widget_set_size_request(drawingArea, -1, UI_VISUALIZER_HEIGHT);      
         gtk_widget_show(visualizerContainerBox);      
         gtk_widget_show(drawingArea);      
       
@@ -183,37 +183,6 @@ void UI::onSeekChanged(GtkRange* range, gpointer data) {
     if (!ui->isSeeking) ui->player->seek(gtk_range_get_value(range));
 }
 
-// Helper function to update album art display
-void UI::updateAlbumArt() {
-    // First, free the previous album art if it exists
-    if (appState.current_album_art) {
-        g_object_unref(appState.current_album_art);
-        appState.current_album_art = nullptr;
-    }
-
-    // Try to extract album art for the current track
-    if (!appState.playlist.empty() && appState.current_track_idx >= 0 &&
-        appState.current_track_idx < (int)appState.play_order.size()) {
-
-        size_t real_idx = appState.play_order[appState.current_track_idx];
-        if (real_idx < appState.playlist.size()) {
-            std::string track_path = appState.playlist[real_idx];
-
-            // Try to extract album art from the audio file or its directory
-            appState.current_album_art = Utils::loadAlbumArtFromCache(track_path, 150);
-
-            if (appState.current_album_art) {
-                // Update the album art image widget
-                gtk_image_set_from_pixbuf(GTK_IMAGE(albumArtImage), appState.current_album_art);
-                gtk_widget_show(albumArtImage); // Make sure it's visible
-            } else {
-                // If no album art found, hide the image widget or show a default
-                gtk_image_set_from_icon_name(GTK_IMAGE(albumArtImage), "audio-x-generic", GTK_ICON_SIZE_DIALOG);
-                gtk_widget_hide(albumArtImage); // Hide if no art
-            }
-        }
-    }
-}
 
 // --- EQUALIZER HANDLERS ---
 void UI::onEqToggled(GtkToggleButton* toggle, gpointer data) {
@@ -515,15 +484,8 @@ void UI::buildWidgets() {
 
     drawingArea = gtk_drawing_area_new();
     g_object_ref(drawingArea);
-    gtk_widget_set_size_request(drawingArea, -1, VISUALIZER_FULL_HEIGHT);
+    gtk_widget_set_size_request(drawingArea, -1, UI_VISUALIZER_HEIGHT);
     gtk_box_pack_start(GTK_BOX(visualizerContainerBox), drawingArea, FALSE, FALSE, 0);
-
-    // Album Art Display
-    albumArtImage = gtk_image_new();
-    gtk_widget_set_size_request(albumArtImage, 150, 150);
-    gtk_widget_set_halign(albumArtImage, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(mainBox), albumArtImage, FALSE, FALSE, 2);
-    gtk_widget_hide(albumArtImage); // Initially hidden until album art is found
 
     lblInfo = gtk_label_new("Ready");
     gtk_label_set_ellipsize(GTK_LABEL(lblInfo), PANGO_ELLIPSIZE_END);
@@ -582,7 +544,7 @@ void UI::buildWidgets() {
         gtk_scale_set_draw_value(GTK_SCALE(slider), TRUE);
         gtk_scale_set_value_pos(GTK_SCALE(slider), GTK_POS_BOTTOM);
         gtk_range_set_value(GTK_RANGE(slider), 0.0); // Default flat
-        gtk_widget_set_size_request(slider, -1, 80); // Fixed height for better layout
+        gtk_widget_set_size_request(slider, -1, UI_EQ_SLIDER_HEIGHT); // Fixed height for better layout
 
         gtk_box_pack_start(GTK_BOX(bandBox), slider, TRUE, TRUE, 0);
         gtk_box_pack_start(GTK_BOX(bandBox), label, FALSE, FALSE, 0);
@@ -663,7 +625,7 @@ void UI::buildWidgets() {
       
     GtkWidget* scrolled = gtk_scrolled_window_new(NULL, NULL);      
     gtk_widget_set_vexpand(scrolled, TRUE);       
-    gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(scrolled), 150);       
+    gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(scrolled), UI_PLAYLIST_MIN_CONTENT_HEIGHT);       
     playlistBox = gtk_list_box_new();      
     g_object_ref(playlistBox);       
     gtk_container_add(GTK_CONTAINER(scrolled), playlistBox);      
@@ -704,17 +666,6 @@ int UI::run() {
     player = new Player(&appState);
     visualizer = new Visualizer(&appState);
 
-    // Set up album art callback
-    appState.onAlbumArtChanged = [](void* userData) {
-        UI* ui = (UI*)userData;
-        // Update album art from main thread
-        g_idle_add([](gpointer data) -> gboolean {
-            UI* ui = (UI*)data;
-            ui->updateAlbumArt();
-            return G_SOURCE_REMOVE;
-        }, ui);
-    };
-    appState.albumArtCallbackUserData = this;
 
     buildWidgets();
     playlistMgr = new PlaylistManager(&appState, player, playlistBox);
