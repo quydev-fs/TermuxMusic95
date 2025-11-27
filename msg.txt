@@ -1,0 +1,9 @@
+Analyze every file and folder content in this project folder to understand it better, then write what you understand from that analysis into a file named QWEN.md
+
+You should analyze both files, folders and commit history to get a more comprehensive view.
+
+and also the libraries used in the project, the function syntax, and notes on GTK libraries
+
+and important note: this project is a re-creation of the UI of WinAMP version 2.x, runs on Termux and Linux, currently using Gstreamer header to play audio files
+
+now, do the task!
