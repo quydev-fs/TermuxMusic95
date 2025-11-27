@@ -51,6 +51,10 @@ private:
     static void onCrossfadeToggled(GtkToggleButton* toggle, gpointer data);
     static void onCrossfadeDurationChanged(GtkRange* range, gpointer data);
 
+    // --- Audio Conversion Handlers ---
+    static void onConvertAudioClicked(GtkButton* btn, gpointer data);
+    static void onConvertFormatChanged(GtkComboBox* combo, gpointer data);
+
     static gboolean onUpdateTick(gpointer data);
     static gboolean onKeyPress(GtkWidget* widget, GdkEventKey* event, gpointer data);
 
@@ -83,6 +87,11 @@ private:
     GtkWidget* crossfadeToggle;
     GtkWidget* crossfadeDurationScale;
     GtkWidget* crossfadeDurationLabel;
+
+    // Audio conversion widgets
+    GtkWidget* convertBtn;
+    GtkWidget* convertFormatCombo;
+    GtkWidget* convertProgress;
 
     bool isSeeking = false;
     bool is_mini_mode = false;

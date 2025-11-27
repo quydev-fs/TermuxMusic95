@@ -1,7 +1,8 @@
-#include "ui.h"      
-#include <iostream>      
-#include <iomanip>      
-#include <sstream>      
+#include "ui.h"
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <thread>
       
 // --- CONSTANTS ---      
 const int FULL_WIDTH = 320;      
@@ -269,6 +270,103 @@ void UI::onCrossfadeDurationChanged(GtkRange* range, gpointer data) {
     sprintf(text, "%.1f s", value);
     gtk_label_set_text(GTK_LABEL(ui->crossfadeDurationLabel), text);
 }
+
+// --- AUDIO CONVERSION HANDLERS ---
+void UI::onConvertAudioClicked(GtkButton* btn, gpointer data) {
+    UI* ui = (UI*)data;
+
+    // Get the currently selected track in the playlist
+    GtkListBoxRow* row = gtk_list_box_get_selected_row(GTK_LIST_BOX(ui->playlistBox));
+    if (!row) {
+        std::cerr << "No track selected for conversion" << std::endl;
+        return;
+    }
+
+    int selected_index = gtk_list_box_row_get_index(row);
+    if (selected_index < 0 || selected_index >= (int)ui->appState.playlist.size()) {
+        std::cerr << "Invalid playlist index" << std::endl;
+        return;
+    }
+
+    // Get the selected format
+    int format_index = gtk_combo_box_get_active(GTK_COMBO_BOX(ui->convertFormatCombo));
+    if (format_index < 0) {
+        std::cerr << "No format selected for conversion" << std::endl;
+        return;
+    }
+
+    // Get the output format from the combo box
+    gchar* format_text = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(ui->convertFormatCombo));
+    if (!format_text) {
+        std::cerr << "Failed to get selected format" << std::endl;
+        return;
+    }
+
+    std::string input_path = ui->appState.playlist[selected_index];
+    std::string output_format = format_text;
+    g_free(format_text);
+
+    // Generate output path (change extension)
+    std::string output_path = input_path;
+    size_t last_dot = output_path.find_last_of(".");
+    if (last_dot != std::string::npos) {
+        output_path = output_path.substr(0, last_dot + 1) + output_format;
+    } else {
+        output_path += "." + output_format;
+    }
+
+    // Disable convert button during conversion
+    gtk_widget_set_sensitive(ui->convertBtn, FALSE);
+
+    // Show progress bar
+    gtk_widget_show(ui->convertProgress);
+
+    // Perform the conversion in a separate thread
+    ui->appState.conversion_in_progress = true;
+
+    std::thread conversion_thread([ui, input_path, output_path, output_format]() {
+        // Simple progress simulation since actual progress is difficult with GStreamer pipelines
+        bool success = Utils::convertAudioFormat(input_path, output_path, output_format);
+
+        // Store the result
+        std::string result_msg = success ? "Conversion completed: " + output_path : "Conversion failed!";
+
+        // Update UI after conversion
+        struct ConversionResult {
+            UI* ui;
+            std::string msg;
+            ConversionResult(UI* u, const std::string& m) : ui(u), msg(m) {}
+        };
+
+        ConversionResult* result = new ConversionResult(ui, result_msg);
+
+        g_idle_add([](gpointer data) -> gboolean {
+            ConversionResult* result = (ConversionResult*)data;
+            UI* ui = result->ui;
+
+            if (ui->appState.conversion_in_progress) {
+                ui->appState.conversion_in_progress = false;
+            }
+
+            // Hide progress bar and re-enable button
+            gtk_widget_hide(ui->convertProgress);
+            gtk_widget_set_sensitive(ui->convertBtn, TRUE);
+
+            ui->appState.last_conversion_output_path = result->msg;
+
+            delete result;
+
+            return G_SOURCE_REMOVE;
+        }, result);
+    });
+
+    conversion_thread.detach();
+}
+
+void UI::onConvertFormatChanged(GtkComboBox* combo, gpointer data) {
+    // This handler can be used to update UI based on selected format
+    // For now, we'll just keep it as a placeholder
+}
 gboolean UI::onUpdateTick(gpointer data) {      
     UI* ui = (UI*)data;      
     if (!ui->player) return TRUE;      
@@ -477,6 +575,28 @@ void UI::buildWidgets() {
     gtk_box_pack_start(GTK_BOX(mainBox), crossfadeBox, FALSE, FALSE, 2);
     gtk_widget_set_sensitive(crossfadeDurationScale, false); // Initially disabled
 
+    // Audio Conversion Controls
+    GtkWidget* convertBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
+    convertBtn = gtk_button_new_with_label("Convert");
+    convertFormatCombo = gtk_combo_box_text_new();
+
+    // Add supported formats to the combo box
+    auto formats = Utils::getSupportedOutputFormats();
+    for (const auto& format : formats) {
+        gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(convertFormatCombo), NULL, format.c_str());
+    }
+
+    gtk_combo_box_set_active(GTK_COMBO_BOX(convertFormatCombo), 0); // Default to first format
+    convertProgress = gtk_progress_bar_new();
+    gtk_widget_set_hexpand(convertProgress, TRUE);
+    gtk_widget_hide(convertProgress); // Initially hidden
+
+    gtk_box_pack_start(GTK_BOX(convertBox), convertBtn, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(convertBox), convertFormatCombo, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(convertBox), convertProgress, TRUE, TRUE, 0);
+
+    gtk_box_pack_start(GTK_BOX(mainBox), convertBox, FALSE, FALSE, 2);
+
     GtkWidget* controlsBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     GtkWidget* btnPrev = gtk_button_new_with_label("<");
     GtkWidget* btnPlay = gtk_button_new_with_label("|>");
@@ -535,6 +655,10 @@ void UI::buildWidgets() {
     // Crossfading Signal Connections
     g_signal_connect(crossfadeToggle, "toggled", G_CALLBACK(onCrossfadeToggled), this);
     g_signal_connect(crossfadeDurationScale, "value-changed", G_CALLBACK(onCrossfadeDurationChanged), this);
+
+    // Audio Conversion Signal Connections
+    g_signal_connect(convertBtn, "clicked", G_CALLBACK(onConvertAudioClicked), this);
+    g_signal_connect(convertFormatCombo, "changed", G_CALLBACK(onConvertFormatChanged), this);
 }
       
 int UI::run() {

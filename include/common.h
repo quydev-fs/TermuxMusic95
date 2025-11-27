@@ -43,6 +43,11 @@ struct AppState {
     bool crossfading_enabled = false;
     double crossfade_duration = 3.0;  // 3 seconds default crossfade
     bool is_crossfading = false;
+
+    // NEW: Audio conversion state
+    bool conversion_in_progress = false;
+    std::string last_conversion_output_path;
+    double conversion_progress = 0.0;  // 0.0 to 1.0
 };
 
 #endif
